@@ -1,0 +1,39 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #0f1115;
+  color: #fff;
+  margin: 0;
+  padding: 20px;
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.card, .actions {
+  background: #171b22;
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+button {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#payBtn { background: #15c47e; color: #fff; }
+#mintBtn { background: #2d6cff; color: #fff; }
+
+#status {
+  margin-top: 16px;
+  color: #9ad1ff;
+  white-space: pre-wrap;
+}

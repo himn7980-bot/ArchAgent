@@ -1,0 +1,7 @@
+{
+  "url": "https://YOUR-NGROK-OR-DOMAIN",
+  "name": "ArchAgent",
+  "iconUrl": "https://YOUR-NGROK-OR-DOMAIN/webapp/icon.png",
+  "termsOfUseUrl": "https://YOUR-NGROK-OR-DOMAIN/terms",
+  "privacyPolicyUrl": "https://YOUR-NGROK-OR-DOMAIN/privacy"
+}

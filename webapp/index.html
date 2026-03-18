@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ArchAgent TON Panel</title>
+  <link rel="stylesheet" href="/webapp/styles.css" />
+  <script src="https://unpkg.com/@tonconnect/ui@2.0.0/dist/tonconnect-ui.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <div class="card">
+      <h1>ArchAgent TON Panel</h1>
+      <p class="sub">Connect wallet, pay with TON, or mint your design as NFT.</p>
+      <div id="ton-connect"></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><span>Project ID</span><strong id="projectId">-</strong></div>
+      <div class="row"><span>User ID</span><strong id="userId">-</strong></div>
+      <div class="row"><span>Wallet</span><strong id="walletAddress">Not connected</strong></div>
+    </div>
+
+    <div class="card actions">
+      <button id="payBtn">💰 Pay 0.2 TON for Pro Unlock</button>
+      <button id="mintBtn">🖼 Mint Design as NFT</button>
+    </div>
+
+    <div class="card">
+      <pre id="status">Waiting...</pre>
+    </div>
+  </div>
+
+  <script src="/webapp/app.js"></script>
+</body>
+</html>

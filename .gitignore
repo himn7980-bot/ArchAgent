@@ -1,0 +1,6 @@
+.env
+pycache/
+ai_outputs/
+user_uploads/
+data/
+*.pyc
