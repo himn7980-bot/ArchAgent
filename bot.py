@@ -7,6 +7,9 @@ from telegram.ext import (
     CallbackQueryHandler,
     ContextTypes,
     filters,
+from fastapi import FastAPI
+import uvicorn
+import threading
 )
 
 from config import BOT_TOKEN, MINIAPP_URL, UPLOAD_DIR
@@ -397,6 +400,18 @@ async def handle_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 def main() -> None:
+   app_web = FastAPI()
+
+@app_web.get("/")
+def health():
+    return {"app": "ArchAgent", "ok": True}
+
+
+def run_api():
+    uvicorn.run(app_web, host="0.0.0.0", port=10000)
+
+
+def main() -> None:
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -410,5 +425,7 @@ def main() -> None:
     app.run_polling()
 
 
-if __name__ == "__main__":
+if name == "main":
+    threading.Thread(target=run_api, daemon=True).start()
     main()
+    
