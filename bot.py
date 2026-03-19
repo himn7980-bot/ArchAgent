@@ -1,4 +1,8 @@
 import os
+import threading
+import uvicorn
+from fastapi import FastAPI
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import (
     ApplicationBuilder,
@@ -7,10 +11,6 @@ from telegram.ext import (
     CallbackQueryHandler,
     ContextTypes,
     filters,
-from fastapi import FastAPI
-import uvicorn
-import threading
-import os
 )
 
 from config import BOT_TOKEN, MINIAPP_URL, UPLOAD_DIR
@@ -426,6 +426,19 @@ def run_api():
 
 
 def main() -> None:
+app_web = FastAPI()
+
+@app_web.get("/")
+def health():
+    return {"app": "ArchAgent", "ok": True}
+
+
+def run_api():
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app_web, host="0.0.0.0", port=port)
+
+
+def main() -> None:
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -441,4 +454,4 @@ def main() -> None:
 
 if name == "main":
     threading.Thread(target=run_api, daemon=True).start()
-    main()
+    main()main()
