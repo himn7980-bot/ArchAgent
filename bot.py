@@ -262,8 +262,8 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     tg_file = await context.bot.get_file(photo_file.file_id)
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.jpg")
-    await tg_file.download_to_drive(image_path)
+image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.jpg")
+await tg_file.download_to_drive(image_path)
 
     context.user_data["photo_path"] = image_path
     context.user_data["space_type"] = "interior"
