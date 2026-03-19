@@ -430,6 +430,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
     threading.Thread(target=run_api, daemon=True).start()
     main()
