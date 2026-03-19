@@ -425,7 +425,6 @@ def run_api():
     uvicorn.run(app_web, host="0.0.0.0", port=port)
 
 
-def main() -> None:
 app_web = FastAPI()
 
 @app_web.get("/")
