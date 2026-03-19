@@ -1,8 +1,8 @@
 import os
 import threading
+
 import uvicorn
 from fastapi import FastAPI
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import (
     ApplicationBuilder,
@@ -48,10 +48,12 @@ def detect_message_lang(text: str) -> str:
 
 
 def get_user_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
-    if "lang" in context.user_data:
-        return context.user_data["lang"]
+    saved_lang = context.user_data.get("lang")
+    if saved_lang:
+        return saved_lang
 
-    lang = update.effective_user.language_code or "en"
+    lang = (update.effective_user.language_code or "en").lower()
+
     if lang.startswith("fa"):
         return "fa"
     if lang.startswith("ar"):
@@ -63,7 +65,7 @@ def get_user_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
 
 def t(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str) -> str:
     lang = get_user_lang(update, context)
-    return TEXTS.get(lang, TEXTS["en"])[key]
+    return TEXTS.get(lang, TEXTS["en"]).get(key, TEXTS["en"].get(key, key))
 
 
 def style_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
@@ -75,46 +77,48 @@ def style_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Inline
             "classic": "🏛 Classic",
             "minimal": "⚪ Minimal",
             "luxury": "✨ Luxury",
-            "arabic": "🕌 Arabic"
+            "arabic": "🕌 Arabic",
         },
         "fa": {
             "modern": "🟦 مدرن",
             "classic": "🏛 کلاسیک",
             "minimal": "⚪ مینیمال",
             "luxury": "✨ لوکس",
-            "arabic": "🕌 عربی"
+            "arabic": "🕌 عربی",
         },
         "ar": {
             "modern": "🟦 حديث",
             "classic": "🏛 كلاسيكي",
             "minimal": "⚪ مينيمال",
             "luxury": "✨ فاخر",
-            "arabic": "🕌 عربي"
+            "arabic": "🕌 عربي",
         },
         "ru": {
             "modern": "🟦 Современный",
             "classic": "🏛 Классический",
             "minimal": "⚪ Минимализм",
             "luxury": "✨ Люкс",
-            "arabic": "🕌 Арабский"
+            "arabic": "🕌 Арабский",
         },
     }
 
     l = labels.get(lang, labels["en"])
 
-    return InlineKeyboardMarkup([
+    return InlineKeyboardMarkup(
         [
-            InlineKeyboardButton(l["modern"], callback_data="style_modern"),
-            InlineKeyboardButton(l["classic"], callback_data="style_classic"),
-        ],
-        [
-            InlineKeyboardButton(l["minimal"], callback_data="style_minimal"),
-            InlineKeyboardButton(l["luxury"], callback_data="style_luxury"),
-        ],
-        [
-            InlineKeyboardButton(l["arabic"], callback_data="style_arabic"),
-        ],
-    ])
+            [
+                InlineKeyboardButton(l["modern"], callback_data="style_modern"),
+                InlineKeyboardButton(l["classic"], callback_data="style_classic"),
+            ],
+            [
+                InlineKeyboardButton(l["minimal"], callback_data="style_minimal"),
+                InlineKeyboardButton(l["luxury"], callback_data="style_luxury"),
+            ],
+            [
+                InlineKeyboardButton(l["arabic"], callback_data="style_arabic"),
+            ],
+        ]
+    )
 
 
 def result_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE, project_id: str) -> InlineKeyboardMarkup:
@@ -149,21 +153,23 @@ def result_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE, project_
 
     l = labels.get(lang, labels["en"])
 
-    return InlineKeyboardMarkup([
+    return InlineKeyboardMarkup(
         [
-            InlineKeyboardButton(l["redo"], callback_data="redo"),
-            InlineKeyboardButton(l["style"], callback_data="change_style"),
-        ],
-        [
-            InlineKeyboardButton(
-                l["pay"],
-                web_app=WebAppInfo(
-                    url=f"{MINIAPP_URL}?project_id={project_id}&user_id={update.effective_user.id}"
+            [
+                InlineKeyboardButton(l["redo"], callback_data="redo"),
+                InlineKeyboardButton(l["style"], callback_data="change_style"),
+            ],
+            [
+                InlineKeyboardButton(
+                    l["pay"],
+                    web_app=WebAppInfo(
+                        url=f"{MINIAPP_URL}?project_id={project_id}&user_id={update.effective_user.id}"
+                    ),
                 ),
-            ),
-            InlineKeyboardButton(l["mint"], callback_data="mint_hint"),
-        ],
-    ])
+                InlineKeyboardButton(l["mint"], callback_data="mint_hint"),
+            ],
+        ]
+    )
 
 
 def build_prompt(space_type: str, style: str, user_text: str) -> str:
@@ -189,7 +195,7 @@ Rules:
 - Keep the result realistic and buildable
 - Professional architectural visualization
 - High quality realistic render
-"""
+""".strip()
 
     if space_type == "interior":
         return f"""
@@ -202,7 +208,7 @@ Extra interior rules:
 - Do not change the structure of the room
 - Only redesign materials, furniture, decoration and lighting
 - Keep surfaces clean and architectural
-"""
+""".strip()
 
     if space_type == "exterior":
         return f"""
@@ -215,7 +221,7 @@ Extra exterior rules:
 - Preserve the number of floors
 - Maintain the same window layout
 - Only redesign facade style, materials and decorative elements
-"""
+""".strip()
 
     if space_type == "unfinished":
         return f"""
@@ -228,7 +234,7 @@ Extra unfinished rules:
 - Complete unfinished surfaces and details
 - Add realistic finishing materials
 - Keep the same space composition
-"""
+""".strip()
 
     return f"""
 Renovate this existing old space or building based on the user's request.
@@ -239,24 +245,30 @@ Extra renovation rules:
 - Preserve the original layout and proportions
 - Improve the style, materials and overall appearance
 - Make it look realistically renovated
-"""
+""".strip()
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data["lang"] = get_user_lang(update, context)
+    context.user_data["awaiting_description"] = False
     await update.message.reply_text(t(update, context, "welcome"))
 
 
 async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message or not update.message.photo:
+        return
+
     photo_file = update.message.photo[-1]
     tg_file = await context.bot.get_file(photo_file.file_id)
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    image_path = f"{UPLOAD_DIR}/{update.effective_user.id}.jpg"
+    image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.jpg")
     await tg_file.download_to_drive(image_path)
 
     context.user_data["photo_path"] = image_path
-    context.user_data.pop("style", None)
+    context.user_data["space_type"] = "interior"
+    context.user_data["style"] = None
+    context.user_data["awaiting_description"] = False
 
     await update.message.reply_text(t(update, context, "photo_received"))
 
@@ -266,7 +278,10 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         detected_scene = "interior"
 
     context.user_data["space_type"] = detected_scene
-    await update.message.reply_text(f"{t(update, context, 'scene_detected')} {detected_scene}")
+
+    await update.message.reply_text(
+        f"{t(update, context, 'scene_detected')} {detected_scene}"
+    )
     await update.message.reply_text(
         t(update, context, "choose_style"),
         reply_markup=style_keyboard(update, context),
@@ -275,6 +290,9 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def handle_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
+    if not query:
+        return
+
     await query.answer()
 
     mapping = {
@@ -285,39 +303,53 @@ async def handle_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "style_arabic": "arabic",
     }
 
-    context.user_data["style"] = mapping.get(query.data)
+    selected_style = mapping.get(query.data)
+
+    if not selected_style:
+        await query.message.reply_text("Style not found.")
+        return
+
+    context.user_data["style"] = selected_style
+    context.user_data["awaiting_description"] = True
+
     await query.message.reply_text(t(update, context, "ask_change"))
 
 
 async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, user_text: str) -> None:
-    if "photo_path" not in context.user_data:
+    photo_path = context.user_data.get("photo_path")
+    style = context.user_data.get("style")
+    awaiting_description = context.user_data.get("awaiting_description", False)
+
+    if not photo_path or not os.path.exists(photo_path):
         await update.message.reply_text(t(update, context, "send_photo_first"))
         return
 
-    if "style" not in context.user_data:
+    if not style:
         await update.message.reply_text(t(update, context, "choose_style_first"))
         return
 
-    image_path = context.user_data["photo_path"]
+    if not awaiting_description:
+        await update.message.reply_text(t(update, context, "ask_change"))
+        return
+
     space_type = context.user_data.get("space_type", "interior")
-    style = context.user_data["style"]
 
     await update.message.reply_text(t(update, context, "generating"))
 
     try:
         prompt = build_prompt(space_type, style, user_text)
-        generated_image = generate_design(image_path, prompt)
+        generated_image = generate_design(photo_path, prompt)
 
         project_payload = {
             "space_type": space_type,
             "style": style,
             "request_text": user_text,
-            "source_image": image_path,
+            "source_image": photo_path,
             "generated_image": generated_image,
         }
         project_id = create_project(str(update.effective_user.id), project_payload)
 
-        if generated_image.startswith("http"):
+        if isinstance(generated_image, str) and generated_image.startswith("http"):
             await update.message.reply_photo(
                 photo=generated_image,
                 caption=t(update, context, "result_caption"),
@@ -330,19 +362,27 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
                 )
 
         await update.message.reply_text(
-            t(update, context, "materials_title") + "\n- " + "\n- ".join(suggest_materials(space_type, style))
+            t(update, context, "materials_title")
+            + "\n- "
+            + "\n- ".join(suggest_materials(space_type, style))
         )
+
         await update.message.reply_text(
             t(update, context, "cost_title") + f"\n{estimate_cost(space_type, style)}"
         )
+
         await update.message.reply_text(
-            t(update, context, "stores_title") + "\n- " + "\n- ".join(get_store_suggestions(space_type, style))
+            t(update, context, "stores_title")
+            + "\n- "
+            + "\n- ".join(get_store_suggestions(space_type, style))
         )
 
         await update.message.reply_text(
             t(update, context, "wallet_prompt"),
-            reply_markup=result_keyboard(update, context, project_id)
+            reply_markup=result_keyboard(update, context, project_id),
         )
+
+        context.user_data["awaiting_description"] = False
 
     except Exception as e:
         await update.message.reply_text(t(update, context, "ai_failed"))
@@ -350,7 +390,13 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
 
 
 async def description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_text = update.message.text
+    if not update.message or not update.message.text:
+        return
+
+    user_text = update.message.text.strip()
+    if not user_text:
+        return
+
     context.user_data["lang"] = detect_message_lang(user_text)
     await process_request(update, context, user_text)
 
@@ -360,10 +406,13 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text(t(update, context, "send_photo_first"))
         return
 
+    if not update.message or not update.message.voice:
+        return
+
     await update.message.reply_text(t(update, context, "voice_processing"))
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    voice_path = f"{UPLOAD_DIR}/{update.effective_user.id}_voice.ogg"
+    voice_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}_voice.ogg")
 
     voice = update.message.voice
     tg_file = await context.bot.get_file(voice.file_id)
@@ -372,6 +421,7 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     try:
         transcribed_text = transcribe_voice(voice_path)
         context.user_data["lang"] = detect_message_lang(transcribed_text)
+        context.user_data["awaiting_description"] = True
 
         await update.message.reply_text(transcribed_text)
         await process_request(update, context, transcribed_text)
@@ -383,35 +433,38 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def handle_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    if not query:
+        return
 
+    await query.answer()
     data = query.data
 
     if data == "redo":
+        context.user_data["awaiting_description"] = True
         await query.message.reply_text(t(update, context, "ask_change"))
 
     elif data == "change_style":
+        context.user_data["awaiting_description"] = False
+        context.user_data["style"] = None
         await query.message.reply_text(
             t(update, context, "choose_style"),
-            reply_markup=style_keyboard(update, context)
+            reply_markup=style_keyboard(update, context),
         )
 
     elif data == "mint_hint":
         await query.message.reply_text(t(update, context, "coming_mint"))
 
 
-def main() -> None:
-   app_web = FastAPI()
-
 app_web = FastAPI()
+
 
 @app_web.get("/")
 def health():
     return {"app": "ArchAgent", "ok": True}
 
 
-def run_api():
-    port = int(os.environ.get("PORT", 10000))
+def run_api() -> None:
+    port = int(os.environ.get("PORT", "10000"))
     uvicorn.run(app_web, host="0.0.0.0", port=port)
 
 
@@ -426,7 +479,7 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, description))
 
     print("ArchAgent running...")
-    app.run_polling()
+    app.run_polling(close_loop=False)
 
 
 if __name__ == "__main__":
