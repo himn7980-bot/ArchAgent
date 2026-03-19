@@ -429,6 +429,6 @@ def main() -> None:
     app.run_polling()
 
 
-if name == "main":
+if __name__ == "__main__":
     threading.Thread(target=run_api, daemon=True).start()
     main()
