@@ -403,28 +403,6 @@ async def handle_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 def main() -> None:
    app_web = FastAPI()
 
-@app_web.get("/")
-def health():
-    return {"app": "ArchAgent", "ok": True}
-
-
-def run_api():
-    uvicorn.run(app_web, host="0.0.0.0", port=10000)
-
-
-def main() -> None:
-   app_web = FastAPI()
-
-@app_web.get("/")
-def health():
-    return {"app": "ArchAgent", "ok": True}
-
-
-def run_api():
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run(app_web, host="0.0.0.0", port=port)
-
-
 app_web = FastAPI()
 
 @app_web.get("/")
