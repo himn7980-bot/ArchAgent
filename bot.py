@@ -454,4 +454,4 @@ def main() -> None:
 
 if name == "main":
     threading.Thread(target=run_api, daemon=True).start()
-    main()main()
+    main()
