@@ -278,7 +278,7 @@ context.user_data["awaiting_description"] = False
 
 await update.message.reply_text(t(update, context, "photo_received"))
 
-    try:
+try:
         detected_scene = detect_scene(image_path)
     except Exception:
         detected_scene = "interior"
