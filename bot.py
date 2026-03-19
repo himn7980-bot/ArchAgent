@@ -1,6 +1,7 @@
 import os
 import threading
 from PIL import Image
+
 import uvicorn
 from fastapi import FastAPI
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -263,22 +264,22 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-temp_jpg_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.jpg")
-image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.png")
+    temp_jpg_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.jpg")
+    image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.png")
 
-await tg_file.download_to_drive(temp_jpg_path)
+    await tg_file.download_to_drive(temp_jpg_path)
 
-with Image.open(temp_jpg_path) as img:
-    img.convert("RGBA").save(image_path, "PNG")
+    with Image.open(temp_jpg_path) as img:
+        img.convert("RGBA").save(image_path, "PNG")
 
-context.user_data["photo_path"] = image_path
-context.user_data["space_type"] = "interior"
-context.user_data["style"] = None
-context.user_data["awaiting_description"] = False
+    context.user_data["photo_path"] = image_path
+    context.user_data["space_type"] = "interior"
+    context.user_data["style"] = None
+    context.user_data["awaiting_description"] = False
 
-await update.message.reply_text(t(update, context, "photo_received"))
+    await update.message.reply_text(t(update, context, "photo_received"))
 
-try:
+    try:
         detected_scene = detect_scene(image_path)
     except Exception:
         detected_scene = "interior"
@@ -408,11 +409,15 @@ async def description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message or not update.message.voice:
+        return
+
     if "photo_path" not in context.user_data:
         await update.message.reply_text(t(update, context, "send_photo_first"))
         return
 
-    if not update.message or not update.message.voice:
+    if not context.user_data.get("style"):
+        await update.message.reply_text(t(update, context, "choose_style_first"))
         return
 
     await update.message.reply_text(t(update, context, "voice_processing"))
@@ -480,7 +485,9 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.PHOTO, photo))
     app.add_handler(CallbackQueryHandler(handle_style, pattern="^style_"))
-    app.add_handler(CallbackQueryHandler(handle_actions, pattern="^(redo|change_style|mint_hint)$"))
+    app.add_handler(
+        CallbackQueryHandler(handle_actions, pattern="^(redo|change_style|mint_hint)$")
+    )
     app.add_handler(MessageHandler(filters.VOICE, voice_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, description))
 
