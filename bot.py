@@ -1,6 +1,6 @@
 import os
 import threading
-
+from PIL import Image
 import uvicorn
 from fastapi import FastAPI
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
