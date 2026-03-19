@@ -262,15 +262,21 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     tg_file = await context.bot.get_file(photo_file.file_id)
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.jpg")
-await tg_file.download_to_drive(image_path)
 
-    context.user_data["photo_path"] = image_path
-    context.user_data["space_type"] = "interior"
-    context.user_data["style"] = None
-    context.user_data["awaiting_description"] = False
+temp_jpg_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.jpg")
+image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.png")
 
-    await update.message.reply_text(t(update, context, "photo_received"))
+await tg_file.download_to_drive(temp_jpg_path)
+
+with Image.open(temp_jpg_path) as img:
+    img.convert("RGBA").save(image_path, "PNG")
+
+context.user_data["photo_path"] = image_path
+context.user_data["space_type"] = "interior"
+context.user_data["style"] = None
+context.user_data["awaiting_description"] = False
+
+await update.message.reply_text(t(update, context, "photo_received"))
 
     try:
         detected_scene = detect_scene(image_path)
