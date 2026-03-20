@@ -13,7 +13,7 @@ def generate_design(input_image_path: str, prompt: str) -> str:
             model=IMAGE_MODEL,
             image=image_file,
             prompt=prompt,
-            size=IMAGE_SIZE,
+            size="1024x1024",
         )
 
     image_data = result.data[0]
