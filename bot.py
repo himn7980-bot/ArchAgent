@@ -391,6 +391,12 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
                     caption=t(update, context, "result_caption"),
                 )
 
+        # ----- تغییرات ذخیره اطلاعات برای NFT -----
+        context.user_data["last_generated_image"] = generated_image
+        context.user_data["last_project_id"] = project_id
+        context.user_data["last_style"] = style
+        # ------------------------------------------
+
         await update.message.reply_text(
             t(update, context, "materials_title")
             + "\n- "
@@ -485,8 +491,39 @@ async def handle_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             reply_markup=style_keyboard(update, context),
         )
 
+    # ----- کدهای جدید برای دکمه مینت NFT -----
     elif data == "mint_hint":
-        await query.message.reply_text(t(update, context, "coming_mint"))
+        image_path = context.user_data.get("last_generated_image")
+        project_id = context.user_data.get("last_project_id", "unknown")
+        style = context.user_data.get("last_style", "modern")
+
+        if not image_path or not os.path.exists(image_path):
+            await query.message.reply_text("❌ خطا: عکسی برای تبدیل به NFT پیدا نشد. لطفاً اول یک طرح تولید کنید.")
+            return
+
+        await query.message.reply_text("⏳ در حال انتقال تصویر به فضای غیرمتمرکز (IPFS)... لطفاً کمی صبر کنید.")
+        
+        try:
+            from nft import create_mint_request
+            
+            mint_data = create_mint_request(
+                project_id=project_id,
+                owner_wallet="Pending_Wallet_Connect",
+                title=f"ArchAgent Design - {style.capitalize()}",
+                description="AI-generated architectural redesign generated via ArchAgent Telegram Bot.",
+                local_image_path=image_path
+            )
+
+            metadata_url = mint_data["metadata_url"]
+
+            await query.message.reply_text(
+                f"✅ فایل‌های شما با موفقیت در بلاکچین (IPFS) پین شدند!\n\n"
+                f"🔗 لینک متادیتا:\n{metadata_url}\n\n"
+                f"💎 برای مینت نهایی و دریافت NFT، لطفاً از طریق دکمه 'پنل TON' وارد مینی‌اپ شوید و کیف پول خود را متصل کنید."
+            )
+        except Exception as e:
+            await query.message.reply_text(f"❌ خطا در ساخت NFT:\n{str(e)}")
+    # -----------------------------------------
 
 
 app_web = FastAPI()
