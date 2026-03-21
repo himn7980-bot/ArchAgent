@@ -29,22 +29,21 @@ def detect_message_lang(text: str) -> str:
     if not text:
         return "en"
 
-    has_persian_specific = False
-    has_arabic_block = False
-
-    for ch in text:
-        if "\u0600" <= ch <= "\u06FF":
-            has_arabic_block = True
-            if ch in "پچژگک":
-                has_persian_specific = True
-
-        if "\u0400" <= ch <= "\u04FF":
-            return "ru"
-
-    if has_persian_specific:
+    # حروف اختصاصی فارسی (ی فارسی، ک فارسی و ...)
+    if any(ch in text for ch in "پچژگکی"):
         return "fa"
-    if has_arabic_block:
+    
+    # حروف اختصاصی عربی (ي عربی، ك عربی، ة، ؤ و ...)
+    if any(ch in text for ch in "ةؤإأيي"):
         return "ar"
+
+    # اگر حروف مشترک بود، پیش‌فرض رو برای رباتت فارسی در نظر می‌گیریم
+    if any("\u0600" <= ch <= "\u06FF" for ch in text):
+        return "fa"
+
+    if any("\u0400" <= ch <= "\u04FF" for ch in text):
+        return "ru"
+
     return "en"
 
 
