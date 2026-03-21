@@ -1,20 +1,29 @@
 import os
 import base64
 from openai import OpenAI
-from config import OPENAI_API_KEY, IMAGE_MODEL, IMAGE_SIZE, OUTPUT_DIR
+from config import OPENAI_API_KEY, IMAGE_MODEL, OUTPUT_DIR
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
+    if not os.path.exists(input_image_path) or not os.path.exists(mask_path):
+        raise FileNotFoundError("Input image or mask not found.")
 
-def generate_design(input_image_path: str, prompt: str) -> str:
-    with open(input_image_path, "rb") as image_file:
+    if not prompt or not prompt.strip():
+        raise ValueError("Prompt is empty.")
+
+    with open(input_image_path, "rb") as image_file, open(mask_path, "rb") as mask_file:
         result = client.images.edit(
             model=IMAGE_MODEL,
             image=image_file,
-            prompt=prompt,
+            mask=mask_file,
+            prompt=prompt.strip(),
             size="1024x1024",
         )
+
+    if not getattr(result, "data", None):
+        raise ValueError("No image output received from OpenAI.")
 
     image_data = result.data[0]
 
