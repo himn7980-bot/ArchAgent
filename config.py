@@ -9,6 +9,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 STABILITY_API_KEY = os.getenv("STABILITY_API_KEY", "").strip()
+PINATA_API_KEY = os.getenv("PINATA_API_KEY", "").strip()
+PINATA_SECRET_KEY = os.getenv("PINATA_SECRET_KEY", "").strip()
 
 # =========================
 # OpenAI models
