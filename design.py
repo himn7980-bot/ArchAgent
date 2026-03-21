@@ -1,43 +1,49 @@
 import os
-import base64
-from openai import OpenAI
-from config import OPENAI_API_KEY, OUTPUT_DIR
+import requests
+from config import STABILITY_API_KEY, OUTPUT_DIR
 
-client = OpenAI(api_key=OPENAI_API_KEY)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
-    # بررسی وجود فایل‌های عکس اصلی و ماسک
-    if not os.path.exists(input_image_path) or not os.path.exists(mask_path):
-        raise FileNotFoundError("Input image or mask not found.")
+def generate_design(input_image_path: str, prompt: str, *args, **kwargs) -> str:
+    # ۱. بررسی وجود عکس و کلید
+    if not os.path.exists(input_image_path):
+        raise FileNotFoundError("Input image not found.")
+    
+    if not STABILITY_API_KEY:
+        raise ValueError("STABILITY_API_KEY is not set in environment variables!")
 
-    if not prompt or not prompt.strip():
-        raise ValueError("Prompt is empty.")
+    # ۲. آماده‌سازی درخواست برای Stability AI (حالت Structure برای حفظ فرم ساختمان)
+    url = "https://api.stability.ai/v2beta/stable-image/control/structure"
+    
+    headers = {
+        "Authorization": f"Bearer {STABILITY_API_KEY}",
+        "Accept": "image/*"
+    }
 
-    # استفاده از مدل dall-e-2 برای ویرایش دقیق (Inpainting) روی فرم قبلی
-    with open(input_image_path, "rb") as image_file, open(mask_path, "rb") as mask_file:
-        result = client.images.edit(
-            model="dall-e-2",
-            image=image_file,
-            mask=mask_file,
-            prompt=f"Professional architectural redesign, highly realistic, 8k resolution. {prompt.strip()}",
-            size="1024x1024",
-        )
+    # تقویت پرامپت برای رندر واقعی و باکیفیت
+    enhanced_prompt = f"Professional architectural photography, highly detailed, 8k resolution, realistic lighting and materials. {prompt}"
 
-    if not getattr(result, "data", None):
-        raise ValueError("No image output received from OpenAI.")
+    files = {
+        "image": open(input_image_path, "rb")
+    }
+    
+    data = {
+        "prompt": enhanced_prompt,
+        "control_strength": 0.7, # عدد 0.7 یعنی 70 درصد فرم اصلی ساختمان رو دقیقا حفظ کن
+        "output_format": "jpeg"
+    }
 
-    image_data = result.data[0]
+    # ۳. ارسال درخواست به هوش مصنوعی
+    response = requests.post(url, headers=headers, files=files, data=data)
 
-    # برگرداندن لینک تصویر خروجی
-    if getattr(image_data, "url", None):
-        return image_data.url
-
-    # ذخیره فایل در صورت دریافت Base64
-    if getattr(image_data, "b64_json", None):
-        output_path = os.path.join(OUTPUT_DIR, "last_result.png")
-        with open(output_path, "wb") as f:
-            f.write(base64.b64decode(image_data.b64_json))
+    # ۴. ذخیره نتیجه
+    if response.status_code == 200:
+        output_filename = f"result_{os.path.basename(input_image_path)}.jpeg"
+        output_path = os.path.join(OUTPUT_DIR, output_filename)
+        
+        with open(output_path, "wb") as file:
+            file.write(response.content)
+            
         return output_path
-
-    raise ValueError("No valid image output received from OpenAI.")
+    else:
+        raise Exception(f"Stability AI Error: {response.status_code} - {response.text}")
