@@ -3,7 +3,7 @@ import time
 import uuid
 import requests
 from storage import get_nfts, save_nfts
-from config import NFT_COLLECTION_ADDRESS, PINATA_API_KEY, PINATA_SECRET_KEY
+from config import PINATA_API_KEY, PINATA_SECRET_KEY
 
 def upload_file_to_ipfs(file_path: str) -> str:
     """آپلود تصویر در فضای غیرمتمرکز IPFS"""
@@ -58,7 +58,7 @@ def create_mint_request(project_id: str, owner_wallet: str, title: str, descript
     data[nft_id] = {
         "project_id": project_id,
         "owner_wallet": owner_wallet,
-        "metadata_url": ipfs_metadata_url, # ذخیره لینک بلاکچینی
+        "metadata_url": ipfs_metadata_url,
         "metadata": metadata,
         "status": "pending_mint",
         "created_at": int(time.time()),
