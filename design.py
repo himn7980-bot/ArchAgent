@@ -11,8 +11,9 @@ def encode_image(image_path: str) -> str:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
 def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
-    # ۱. پردازش تصویر با Vision (نادیده گرفتن آیکون‌های اینستاگرام و گوشی)
     base64_image = encode_image(input_image_path)
+    
+    # قدم اول: اسکن مهندسی و دقیق فرم ساختمان
     vision_response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -21,7 +22,7 @@ def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
                 "content": [
                     {
                         "type": "text", 
-                        "text": "This image is a screenshot. Ignore ALL UI elements, text, black borders, and icons. Focus ONLY on the main building/space. Describe its architectural massing, structure, and shape in 2 simple sentences. Do not describe the UI."
+                        "text": "Analyze this building with extreme architectural precision. Describe the EXACT geometric massing, the precise number and grid arrangement of windows/doors, the roof shape, and the exact camera perspective. Ignore all UI, text, and borders. Do NOT describe current materials. Give me a strict geometric blueprint in text format."
                     },
                     {
                         "type": "image_url", 
@@ -30,17 +31,22 @@ def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
                 ],
             }
         ],
-        max_tokens=150
+        max_tokens=200
     )
     structure_desc = vision_response.choices[0].message.content
 
-    # ۲. تولید رندر تمیز و تمام‌صفحه با DALL-E 3
+    # قدم دوم: اجبار DALL-E 3 به کپی کردن فرم
     dalle3_prompt = f"""
     Create a highly photorealistic, 8k resolution architectural visualization. 
-    NO UI elements, NO borders, NO text. Just a pure, clean render.
-    Base Building Structure: {structure_desc}. 
-    User Redesign Request & Style: {prompt}. 
-    Maintain the core building geometry, but completely transform the style and materials as requested.
+    NO UI elements, NO borders.
+    
+    CRITICAL INSTRUCTION: You MUST exactly replicate this geometric structure, window grid, and camera angle:
+    [BASE STRUCTURE]: {structure_desc}
+    
+    Now, apply the following redesign style seamlessly:
+    [NEW STYLE]: {prompt}
+    
+    Do not change the fundamental building volume or window placement. Only change the architectural skin, style, and lighting.
     """
 
     response = client.images.generate(
