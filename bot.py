@@ -1,6 +1,6 @@
 import os
 import threading
-from PIL import Image
+from PIL import Image, ImageDraw
 
 import uvicorn
 from fastapi import FastAPI
@@ -266,13 +266,36 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     temp_jpg_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.jpg")
     image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.png")
+    mask_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}_mask.png")
 
     await tg_file.download_to_drive(temp_jpg_path)
 
+    # 1. Anti-Stretch: Letterboxing the image onto a 1024x1024 canvas
+    target_size = 1024
     with Image.open(temp_jpg_path) as img:
-        img.convert("RGBA").save(image_path, "PNG")
+        img = img.convert("RGBA")
+        original_width, original_height = img.size
+
+        scale = min(target_size / original_width, target_size / original_height)
+        new_width = int(original_width * scale)
+        new_height = int(original_height * scale)
+        resized = img.resize((new_width, new_height), Image.LANCZOS)
+
+        canvas = Image.new("RGBA", (target_size, target_size), (255, 255, 255, 255))
+        paste_x = (target_size - new_width) // 2
+        paste_y = (target_size - new_height) // 2
+        canvas.paste(resized, (paste_x, paste_y), resized)
+        canvas.save(image_path, "PNG")
+
+    # 2. Creating Mask for Inpainting
+    mask_canvas = Image.new("RGBA", (target_size, target_size), (0, 0, 0, 255))
+    draw = ImageDraw.Draw(mask_canvas)
+    margin = 50 # Preserving context around the edges
+    draw.rectangle([margin, margin, target_size - margin, target_size - margin], fill=(0, 0, 0, 0))
+    mask_canvas.save(mask_path, "PNG")
 
     context.user_data["photo_path"] = image_path
+    context.user_data["mask_path"] = mask_path
     context.user_data["space_type"] = "interior"
     context.user_data["style"] = None
     context.user_data["awaiting_description"] = False
@@ -324,6 +347,7 @@ async def handle_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, user_text: str) -> None:
     photo_path = context.user_data.get("photo_path")
+    mask_path = context.user_data.get("mask_path")
     style = context.user_data.get("style")
     awaiting_description = context.user_data.get("awaiting_description", False)
 
@@ -345,7 +369,7 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
 
     try:
         prompt = build_prompt(space_type, style, user_text)
-        generated_image = generate_design(photo_path, prompt)
+        generated_image = generate_design(photo_path, mask_path, prompt)
 
         project_payload = {
             "space_type": space_type,
