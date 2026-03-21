@@ -8,6 +8,7 @@ load_dotenv()
 # =========================
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+STABILITY_API_KEY = os.getenv("STABILITY_API_KEY", "").strip()
 
 # =========================
 # OpenAI models
