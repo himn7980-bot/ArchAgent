@@ -1,52 +1,57 @@
 import os
 import base64
 from openai import OpenAI
-from config import OPENAI_API_KEY, IMAGE_MODEL, OUTPUT_DIR
+from config import OPENAI_API_KEY, OUTPUT_DIR
 
-# راه‌اندازی کلاینت OpenAI
 client = OpenAI(api_key=OPENAI_API_KEY)
-
-# اطمینان از وجود پوشه خروجی‌ها
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+def encode_image(image_path: str) -> str:
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
 
 def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
-    # ۱. بررسی وجود فایل‌ها
-    if not os.path.exists(input_image_path):
-        raise FileNotFoundError(f"Input image not found: {input_image_path}")
-    if not os.path.exists(mask_path):
-        raise FileNotFoundError(f"Mask image not found: {mask_path}")
+    # ۱. پردازش تصویر با Vision (نادیده گرفتن آیکون‌های اینستاگرام و گوشی)
+    base64_image = encode_image(input_image_path)
+    vision_response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text", 
+                        "text": "This image is a screenshot. Ignore ALL UI elements, text, black borders, and icons. Focus ONLY on the main building/space. Describe its architectural massing, structure, and shape in 2 simple sentences. Do not describe the UI."
+                    },
+                    {
+                        "type": "image_url", 
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                    }
+                ],
+            }
+        ],
+        max_tokens=150
+    )
+    structure_desc = vision_response.choices[0].message.content
 
-    if not prompt or not prompt.strip():
-        raise ValueError("Prompt is empty.")
+    # ۲. تولید رندر تمیز و تمام‌صفحه با DALL-E 3
+    dalle3_prompt = f"""
+    Create a highly photorealistic, 8k resolution architectural visualization. 
+    NO UI elements, NO borders, NO text. Just a pure, clean render.
+    Base Building Structure: {structure_desc}. 
+    User Redesign Request & Style: {prompt}. 
+    Maintain the core building geometry, but completely transform the style and materials as requested.
+    """
 
-    # ۲. ارسال عکس و ماسک به API
-    with open(input_image_path, "rb") as image_file, open(mask_path, "rb") as mask_file:
-        result = client.images.edit(
-            model=IMAGE_MODEL,  # معمولاً dall-e-2
-            image=image_file,
-            mask=mask_file,
-            prompt=prompt.strip(),
-            size="1024x1024",
-        )
+    response = client.images.generate(
+        model="dall-e-3",
+        prompt=dalle3_prompt.strip(),
+        size="1024x1024",
+        quality="standard",
+        n=1,
+    )
 
-    # ۳. اعتبارسنجی خروجی
-    if not getattr(result, "data", None):
+    if not getattr(response, "data", None):
         raise ValueError("No image output received from OpenAI.")
 
-    image_data = result.data[0]
-
-    # ۴. استخراج نتیجه (لینک یا فایل)
-    if getattr(image_data, "url", None):
-        return image_data.url
-
-    if getattr(image_data, "b64_json", None):
-        # ساخت یک اسم یکتا برای فایل خروجی تا فایل‌های قبلی پاک نشوند
-        base_name = os.path.basename(input_image_path)
-        output_path = os.path.join(OUTPUT_DIR, f"result_{base_name}")
-        
-        with open(output_path, "wb") as f:
-            f.write(base64.b64decode(image_data.b64_json))
-        return output_path
-
-    raise ValueError("No valid image data (url or b64_json) received from OpenAI.")
+    return response.data[0].url
