@@ -6,58 +6,38 @@ from config import OPENAI_API_KEY, OUTPUT_DIR
 client = OpenAI(api_key=OPENAI_API_KEY)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def encode_image(image_path: str) -> str:
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
-
 def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
-    base64_image = encode_image(input_image_path)
-    
-    # قدم اول: اسکن مهندسی و دقیق فرم ساختمان
-    vision_response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text", 
-                        "text": "Analyze this building with extreme architectural precision. Describe the EXACT geometric massing, the precise number and grid arrangement of windows/doors, the roof shape, and the exact camera perspective. Ignore all UI, text, and borders. Do NOT describe current materials. Give me a strict geometric blueprint in text format."
-                    },
-                    {
-                        "type": "image_url", 
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
-                    }
-                ],
-            }
-        ],
-        max_tokens=200
-    )
-    structure_desc = vision_response.choices[0].message.content
+    # بررسی وجود فایل‌های عکس اصلی و ماسک
+    if not os.path.exists(input_image_path) or not os.path.exists(mask_path):
+        raise FileNotFoundError("Input image or mask not found.")
 
-    # قدم دوم: اجبار DALL-E 3 به کپی کردن فرم
-    dalle3_prompt = f"""
-    Create a highly photorealistic, 8k resolution architectural visualization. 
-    NO UI elements, NO borders.
-    
-    CRITICAL INSTRUCTION: You MUST exactly replicate this geometric structure, window grid, and camera angle:
-    [BASE STRUCTURE]: {structure_desc}
-    
-    Now, apply the following redesign style seamlessly:
-    [NEW STYLE]: {prompt}
-    
-    Do not change the fundamental building volume or window placement. Only change the architectural skin, style, and lighting.
-    """
+    if not prompt or not prompt.strip():
+        raise ValueError("Prompt is empty.")
 
-    response = client.images.generate(
-        model="dall-e-3",
-        prompt=dalle3_prompt.strip(),
-        size="1024x1024",
-        quality="standard",
-        n=1,
-    )
+    # استفاده از مدل dall-e-2 برای ویرایش دقیق (Inpainting) روی فرم قبلی
+    with open(input_image_path, "rb") as image_file, open(mask_path, "rb") as mask_file:
+        result = client.images.edit(
+            model="dall-e-2",
+            image=image_file,
+            mask=mask_file,
+            prompt=f"Professional architectural redesign, highly realistic, 8k resolution. {prompt.strip()}",
+            size="1024x1024",
+        )
 
-    if not getattr(response, "data", None):
+    if not getattr(result, "data", None):
         raise ValueError("No image output received from OpenAI.")
 
-    return response.data[0].url
+    image_data = result.data[0]
+
+    # برگرداندن لینک تصویر خروجی
+    if getattr(image_data, "url", None):
+        return image_data.url
+
+    # ذخیره فایل در صورت دریافت Base64
+    if getattr(image_data, "b64_json", None):
+        output_path = os.path.join(OUTPUT_DIR, "last_result.png")
+        with open(output_path, "wb") as f:
+            f.write(base64.b64decode(image_data.b64_json))
+        return output_path
+
+    raise ValueError("No valid image output received from OpenAI.")
