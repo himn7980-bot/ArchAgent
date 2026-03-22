@@ -14,13 +14,10 @@ def _normalize_lang(lang: str) -> str:
 
     if lang.startswith("fa") or lang in {"persian", "farsi"}:
         return "fa"
-
     if lang.startswith("ar") or lang == "arabic":
         return "ar"
-
     if lang.startswith("ru") or lang == "russian":
         return "ru"
-
     if lang.startswith("en") or lang == "english":
         return "en"
 
@@ -35,7 +32,6 @@ def transcribe_voice(voice_path: str) -> dict:
         "language": "fa" | "ar" | "en" | "ru"
     }
     """
-
     if not OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY is missing.")
 
