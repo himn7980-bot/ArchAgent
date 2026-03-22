@@ -75,13 +75,10 @@ def _raise_api_error(response: requests.Response) -> None:
         text = "<no response body>"
 
     if response.status_code == 402:
-        raise RuntimeError(
-            f"Stability AI Error 402: insufficient credits. Response: {text}"
-        )
+        raise RuntimeError(f"Stability AI Error 402: insufficient credits. Response: {text}")
     if response.status_code == 401:
-        raise RuntimeError(
-            f"Stability AI Error 401: invalid or missing API key. Response: {text}"
-        )
+        raise RuntimeError(f"Stability AI Error 401: invalid or missing API key. Response: {text}")
+
     raise RuntimeError(
         f"Stability AI request failed with status {response.status_code}: {text}"
     )
