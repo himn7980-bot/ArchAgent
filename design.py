@@ -3,7 +3,7 @@ import requests
 from openai import OpenAI
 from config import STABILITY_API_KEY, OPENAI_API_KEY, OUTPUT_DIR
 
-# راه‌اندازی کلاینت OpenAI برای ترجمه و تقویت پرامپت
+# راه‌اندازی کلاینت OpenAI
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -37,7 +37,7 @@ Just return the expanded English prompt.
         return expanded_prompt
     except Exception as e:
         print(f"Translation/Expansion failed: {e}")
-        return textاگر خطا داد، همان متن اصلی را برمی‌گرداند
+        return text  # در صورت خطا، متن اصلی برمی‌گردد
 
 
 def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
@@ -47,10 +47,8 @@ def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
     if not STABILITY_API_KEY:
         raise ValueError("STABILITY_API_KEY is not set in Render Environment Variables!")
 
-    # ۱. ترجمه و تقویت پرامپت (دو جهش فنی: ترجمه + افزودن جزئیات معماری لوکس)
     english_enhanced_prompt = translate_and_expand_prompt(prompt)
 
-    # ۲. آماده‌سازی درخواست برای Stability AI
     url = "https://api.stability.ai/v2beta/stable-image/control/structure"
     
     headers = {
@@ -58,7 +56,6 @@ def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
         "Accept": "image/*"
     }
 
-    # تقویت پرامپت نهایی با کلمات کلیدی رندرهای فوق‌حرفه‌ای معماری
     final_prompt = f"Professional architectural photography, ultra-realistic, highly detailed, 8k resolution, cinematic lighting, premium textures, advanced architectural materials. {english_enhanced_prompt}"
 
     files = {
@@ -67,14 +64,12 @@ def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
     
     data = {
         "prompt": final_prompt,
-        "control_strength": 0.9, # جهش فنی: افزایش پایبندی به فرم به ۹۰٪ (۱۰۰٪ به رفرنس نزدیک‌تر)
+        "control_strength": 0.9, 
         "output_format": "jpeg"
     }
 
-    # ۳. ارسال به هوش مصنوعی (مرحله ای که داورها انگشت‌به‌دهان می‌مانند)
     response = requests.post(url, headers=headers, files=files, data=data)
 
-    # ۴. ذخیره خروجی
     if response.status_code == 200:
         base_name = os.path.basename(input_image_path).split('.')[0]
         output_filename = f"result_hd_{base_name}.jpeg"
