@@ -24,25 +24,34 @@ from materials import suggest_materials
 from cost import estimate_cost
 from stores import get_store_suggestions
 from storage import create_project
+from prompt_engine import PromptEngine
 
 
 def detect_message_lang(text: str) -> str:
     if not text:
         return "en"
-    if any(ch in text for ch in "پچژگکی"): return "fa"
-    if any(ch in text for ch in "ةؤإأيي"): return "ar"
-    if any("\u0600" <= ch <= "\u06FF" for ch in text): return "fa"
-    if any("\u0400" <= ch <= "\u04FF" for ch in text): return "ru"
+    if any(ch in text for ch in "پچژگکی"):
+        return "fa"
+    if any(ch in text for ch in "ةؤإأيي"):
+        return "ar"
+    if any("\u0600" <= ch <= "\u06FF" for ch in text):
+        return "fa"
+    if any("\u0400" <= ch <= "\u04FF" for ch in text):
+        return "ru"
     return "en"
 
 
 def get_user_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     saved_lang = context.user_data.get("lang")
-    if saved_lang: return saved_lang
+    if saved_lang:
+        return saved_lang
     lang = (update.effective_user.language_code or "en").lower()
-    if lang.startswith("fa"): return "fa"
-    if lang.startswith("ar"): return "ar"
-    if lang.startswith("ru"): return "ru"
+    if lang.startswith("fa"):
+        return "fa"
+    if lang.startswith("ar"):
+        return "ar"
+    if lang.startswith("ru"):
+        return "ru"
     return "en"
 
 
@@ -54,19 +63,49 @@ def t(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str) -> str:
 def style_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
     lang = get_user_lang(update, context)
     labels = {
-        "en": {"modern": "🟦 Modern", "classic": "🏛 Classic", "minimal": "⚪ Minimal", "luxury": "✨ Luxury", "arabic": "🕌 Arabic"},
-        "fa": {"modern": "🟦 مدرن", "classic": "🏛 کلاسیک", "minimal": "⚪ مینیمال", "luxury": "✨ لوکس", "arabic": "🕌 عربی"},
-        "ar": {"modern": "🟦 حديث", "classic": "🏛 كلاسيكي", "minimal": "⚪ مينيمال", "luxury": "✨ فاخر", "arabic": "🕌 عربي"},
-        "ru": {"modern": "🟦 Современный", "classic": "🏛 Классический", "minimal": "⚪ Минимализм", "luxury": "✨ Люкс", "arabic": "🕌 Арабский"},
+        "en": {
+            "modern": "🟦 Modern",
+            "classic": "🏛 Classic",
+            "minimal": "⚪ Minimal",
+            "luxury": "✨ Luxury",
+            "arabic": "🕌 Arabic",
+        },
+        "fa": {
+            "modern": "🟦 مدرن",
+            "classic": "🏛 کلاسیک",
+            "minimal": "⚪ مینیمال",
+            "luxury": "✨ لوکس",
+            "arabic": "🕌 عربی",
+        },
+        "ar": {
+            "modern": "🟦 حديث",
+            "classic": "🏛 كلاسيكي",
+            "minimal": "⚪ مينيمال",
+            "luxury": "✨ فاخر",
+            "arabic": "🕌 عربي",
+        },
+        "ru": {
+            "modern": "🟦 Современный",
+            "classic": "🏛 Классический",
+            "minimal": "⚪ Минимализм",
+            "luxury": "✨ Люкс",
+            "arabic": "🕌 Арабский",
+        },
     }
     l = labels.get(lang, labels["en"])
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(l["modern"], callback_data="style_modern"), InlineKeyboardButton(l["classic"], callback_data="style_classic")],
-        [InlineKeyboardButton(l["minimal"], callback_data="style_minimal"), InlineKeyboardButton(l["luxury"], callback_data="style_luxury")],
-        [InlineKeyboardButton(l["arabic"], callback_data="style_arabic")]
+        [
+            InlineKeyboardButton(l["modern"], callback_data="style_modern"),
+            InlineKeyboardButton(l["classic"], callback_data="style_classic"),
+        ],
+        [
+            InlineKeyboardButton(l["minimal"], callback_data="style_minimal"),
+            InlineKeyboardButton(l["luxury"], callback_data="style_luxury"),
+        ],
+        [InlineKeyboardButton(l["arabic"], callback_data="style_arabic")],
     ])
 
-# --- کیبورد مرحله اول: زمان ---
+
 def time_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
     lang = get_user_lang(update, context)
     labels = {
@@ -75,11 +114,17 @@ def time_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineK
     }
     l = labels.get(lang, labels["en"])
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(l["day"], callback_data="time_day"), InlineKeyboardButton(l["night"], callback_data="time_night")],
-        [InlineKeyboardButton(l["sunset"], callback_data="time_sunset"), InlineKeyboardButton(l["skip"], callback_data="time_skip")]
+        [
+            InlineKeyboardButton(l["day"], callback_data="time_day"),
+            InlineKeyboardButton(l["night"], callback_data="time_night"),
+        ],
+        [
+            InlineKeyboardButton(l["sunset"], callback_data="time_sunset"),
+            InlineKeyboardButton(l["skip"], callback_data="time_skip"),
+        ],
     ])
 
-# --- کیبورد مرحله دوم: آب و هوا ---
+
 def weather_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
     lang = get_user_lang(update, context)
     labels = {
@@ -88,8 +133,14 @@ def weather_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Inli
     }
     l = labels.get(lang, labels["en"])
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(l["clear"], callback_data="weather_clear"), InlineKeyboardButton(l["rain"], callback_data="weather_rain")],
-        [InlineKeyboardButton(l["snow"], callback_data="weather_snow"), InlineKeyboardButton(l["skip"], callback_data="weather_skip")]
+        [
+            InlineKeyboardButton(l["clear"], callback_data="weather_clear"),
+            InlineKeyboardButton(l["rain"], callback_data="weather_rain"),
+        ],
+        [
+            InlineKeyboardButton(l["snow"], callback_data="weather_snow"),
+            InlineKeyboardButton(l["skip"], callback_data="weather_skip"),
+        ],
     ])
 
 
@@ -101,50 +152,41 @@ def result_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE, project_
     }
     l = labels.get(lang, labels["en"])
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(l["redo"], callback_data="redo"), InlineKeyboardButton(l["style"], callback_data="change_style")],
-        [InlineKeyboardButton(l["pay"], web_app=WebAppInfo(url=f"{MINIAPP_URL}?project_id={project_id}&user_id={update.effective_user.id}")), InlineKeyboardButton(l["mint"], callback_data="mint_hint")]
+        [
+            InlineKeyboardButton(l["redo"], callback_data="redo"),
+            InlineKeyboardButton(l["style"], callback_data="change_style"),
+        ],
+        [
+            InlineKeyboardButton(
+                l["pay"],
+                web_app=WebAppInfo(
+                    url=f"{MINIAPP_URL}?project_id={project_id}&user_id={update.effective_user.id}"
+                ),
+            ),
+            InlineKeyboardButton(l["mint"], callback_data="mint_hint"),
+        ],
     ])
 
 
-def build_prompt(space_type: str, style: str, time_of_day: str, weather: str, user_text: str) -> str:
-    style_text = {
-        "modern": "modern architectural style",
-        "classic": "classical architectural style",
-        "minimal": "minimal clean contemporary style",
-        "luxury": "luxury premium style",
-        "arabic": "Middle Eastern / Arabic elegant style",
-    }.get(style, "professional design style")
+def normalize_space_type(space_type: str, user_text: str) -> str:
+    st = (space_type or "").strip().lower()
+    text = (user_text or "").strip().lower()
 
-    # ترکیب هوشمندانه زمان و آب و هوا
-    env_parts = []
-    if time_of_day == "day": env_parts.append("bright clear daylight, sunny, vivid blue sky, sharp crisp shadows")
-    elif time_of_day == "night": env_parts.append("cinematic night time render, dark sky, glowing warm interior lights, exterior architectural lighting")
-    elif time_of_day == "sunset": env_parts.append("golden hour lighting, sunset, warm orange and purple sky, dramatic long shadows")
-    
-    if weather == "rain": env_parts.append("rainy weather, wet reflective surfaces, overcast moody atmosphere, water puddles")
-    elif weather == "snow": env_parts.append("snowy winter scene, roof covered in heavy snow, cold atmosphere, soft diffused winter light")
-    elif weather == "clear": env_parts.append("clear clean weather")
+    kitchen_keywords = ["kitchen", "آشپزخانه", "مطبخ"]
+    bathroom_keywords = ["bathroom", "حمام", "سرویس"]
+    living_keywords = ["living room", "پذیرایی", "نشیمن", "هال"]
 
-    env_text = ", ".join(env_parts) if env_parts else "optimal and realistic architectural lighting"
+    if any(k in text for k in kitchen_keywords):
+        return "kitchen"
+    if any(k in text for k in bathroom_keywords):
+        return "bathroom"
+    if any(k in text for k in living_keywords):
+        return "living_room"
 
-    common_rules = f"""
-User request: {user_text}
-Style direction: {style_text}
-Lighting & Environment: {env_text}
+    if st in {"kitchen", "bathroom", "living_room", "interior", "exterior", "unfinished"}:
+        return st
 
-Rules:
-- Keep the original structure and proportions
-- Keep the same camera angle
-- Professional architectural visualization, high quality realistic render
-""".strip()
-
-    if space_type == "interior":
-        return f"Redesign this exact interior space.\n{common_rules}\nExtra: Keep room layout. Only redesign materials and lighting."
-    if space_type == "exterior":
-        return f"Architectural facade redesign.\n{common_rules}\nExtra: Keep exact building structure and window layout."
-    if space_type == "unfinished":
-        return f"Redesign this unfinished space into a completed realistic design.\n{common_rules}"
-    return f"Renovate this existing space.\n{common_rules}"
+    return "interior"
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -154,7 +196,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message or not update.message.photo: return
+    if not update.message or not update.message.photo:
+        return
+
     photo_file = update.message.photo[-1]
     tg_file = await context.bot.get_file(photo_file.file_id)
 
@@ -169,39 +213,67 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     with Image.open(temp_jpg_path) as img:
         img = img.convert("RGBA")
         scale = min(target_size / img.size[0], target_size / img.size[1])
-        new_width, new_height = int(img.size[0] * scale), int(img.size[1] * scale)
+        new_width = int(img.size[0] * scale)
+        new_height = int(img.size[1] * scale)
         resized = img.resize((new_width, new_height), Image.LANCZOS)
+
         canvas = Image.new("RGBA", (target_size, target_size), (255, 255, 255, 255))
-        canvas.paste(resized, ((target_size - new_width) // 2, (target_size - new_height) // 2), resized)
+        paste_x = (target_size - new_width) // 2
+        paste_y = (target_size - new_height) // 2
+        canvas.paste(resized, (paste_x, paste_y), resized)
         canvas.save(image_path, "PNG")
 
     mask_canvas = Image.new("RGBA", (target_size, target_size), (0, 0, 0, 255))
-    ImageDraw.Draw(mask_canvas).rectangle([50, 50, target_size - 50, target_size - 50], fill=(0, 0, 0, 0))
+    draw = ImageDraw.Draw(mask_canvas)
+    draw.rectangle([50, 50, target_size - 50, target_size - 50], fill=(0, 0, 0, 0))
     mask_canvas.save(mask_path, "PNG")
 
-    context.user_data.update({"photo_path": image_path, "mask_path": mask_path, "space_type": "interior", "style": None, "time_of_day": None, "weather": None, "awaiting_description": False})
+    context.user_data.update({
+        "photo_path": image_path,
+        "mask_path": mask_path,
+        "space_type": "interior",
+        "style": None,
+        "time_of_day": None,
+        "weather": None,
+        "awaiting_description": False,
+    })
 
     await update.message.reply_text(t(update, context, "photo_received"))
 
-    try: detected_scene = detect_scene(image_path)
-    except Exception: detected_scene = "interior"
+    try:
+        detected_scene = detect_scene(image_path)
+    except Exception:
+        detected_scene = "interior"
 
     context.user_data["space_type"] = detected_scene
+
     await update.message.reply_text(f"{t(update, context, 'scene_detected')} {detected_scene}")
-    await update.message.reply_text(t(update, context, "choose_style"), reply_markup=style_keyboard(update, context))
+    await update.message.reply_text(
+        t(update, context, "choose_style"),
+        reply_markup=style_keyboard(update, context),
+    )
 
 
 async def handle_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
+    if not query:
+        return
     await query.answer()
 
-    mapping = {"style_modern": "modern", "style_classic": "classic", "style_minimal": "minimal", "style_luxury": "luxury", "style_arabic": "arabic"}
+    mapping = {
+        "style_modern": "modern",
+        "style_classic": "classic",
+        "style_minimal": "minimal",
+        "style_luxury": "luxury",
+        "style_arabic": "arabic",
+    }
     selected_style = mapping.get(query.data)
-    if not selected_style: return
+    if not selected_style:
+        return
 
     context.user_data["style"] = selected_style
-    
-    # رفتن به مرحله انتخاب زمان
+    context.user_data["awaiting_description"] = False
+
     lang = get_user_lang(update, context)
     msg = "حالا زمان رندر را انتخاب کنید ☀️🌙:" if lang == "fa" else "Now select the time of day ☀️🌙:"
     await query.message.reply_text(msg, reply_markup=time_keyboard(update, context))
@@ -209,12 +281,14 @@ async def handle_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def handle_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
+    if not query:
+        return
     await query.answer()
-    
+
     selected_time = query.data.replace("time_", "")
-    context.user_data["time_of_day"] = selected_time if selected_time != "skip" else None
-    
-    # رفتن به مرحله انتخاب آب و هوا
+    context.user_data["time_of_day"] = None if selected_time == "skip" else selected_time
+    context.user_data["awaiting_description"] = False
+
     lang = get_user_lang(update, context)
     msg = "و در نهایت شرایط آب‌و‌هوا را انتخاب کنید 🌧❄️:" if lang == "fa" else "Finally, select the weather condition 🌧❄️:"
     await query.message.reply_text(msg, reply_markup=weather_keyboard(update, context))
@@ -222,12 +296,14 @@ async def handle_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def handle_weather(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
+    if not query:
+        return
     await query.answer()
-    
+
     selected_weather = query.data.replace("weather_", "")
-    context.user_data["weather"] = selected_weather if selected_weather != "skip" else None
+    context.user_data["weather"] = None if selected_weather == "skip" else selected_weather
     context.user_data["awaiting_description"] = True
-    
+
     await query.message.reply_text(t(update, context, "ask_change"))
 
 
@@ -239,32 +315,80 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
     weather = context.user_data.get("weather")
     awaiting_description = context.user_data.get("awaiting_description", False)
 
-    if not photo_path or not os.path.exists(photo_path): return await update.message.reply_text(t(update, context, "send_photo_first"))
-    if not style: return await update.message.reply_text(t(update, context, "choose_style_first"))
-    if not awaiting_description: return await update.message.reply_text(t(update, context, "ask_change"))
+    if not photo_path or not os.path.exists(photo_path):
+        await update.message.reply_text(t(update, context, "send_photo_first"))
+        return
 
-    space_type = context.user_data.get("space_type", "interior")
+    if not style:
+        await update.message.reply_text(t(update, context, "choose_style_first"))
+        return
+
+    if not awaiting_description:
+        await update.message.reply_text(t(update, context, "ask_change"))
+        return
+
+    raw_space_type = context.user_data.get("space_type", "interior")
+    space_type = normalize_space_type(raw_space_type, user_text)
+
     await update.message.reply_text(t(update, context, "generating"))
 
     try:
-        # ساخت پرامپت با در نظر گرفتن زمان و آب‌وهوا به صورت مجزا
-        prompt = build_prompt(space_type, style, time_of_day, weather, user_text)
+        prompt = PromptEngine.build_final_prompt(
+            space_type=space_type,
+            style=style,
+            time_of_day=time_of_day,
+            weather=weather,
+            user_text=user_text,
+        )
+
         generated_image = generate_design(photo_path, mask_path, prompt)
 
-        project_id = create_project(str(update.effective_user.id), {"space_type": space_type, "style": style, "request_text": user_text, "source_image": photo_path, "generated_image": generated_image})
+        project_id = create_project(
+            str(update.effective_user.id),
+            {
+                "space_type": space_type,
+                "style": style,
+                "time_of_day": time_of_day,
+                "weather": weather,
+                "request_text": user_text,
+                "source_image": photo_path,
+                "generated_image": generated_image,
+            },
+        )
 
         if isinstance(generated_image, str) and generated_image.startswith("http"):
-            await update.message.reply_photo(photo=generated_image, caption=t(update, context, "result_caption"))
+            await update.message.reply_photo(
+                photo=generated_image,
+                caption=t(update, context, "result_caption"),
+            )
         else:
             with open(generated_image, "rb") as img_file:
-                await update.message.reply_photo(photo=img_file, caption=t(update, context, "result_caption"))
+                await update.message.reply_photo(
+                    photo=img_file,
+                    caption=t(update, context, "result_caption"),
+                )
 
         context.user_data["last_generated_image"] = generated_image
         context.user_data["last_project_id"] = project_id
         context.user_data["last_style"] = style
-
-        await update.message.reply_text(t(update, context, "wallet_prompt"), reply_markup=result_keyboard(update, context, project_id))
         context.user_data["awaiting_description"] = False
+
+        materials = suggest_materials(space_type, style)
+        if materials:
+            await update.message.reply_text(materials)
+
+        cost_estimate = estimate_cost(space_type, style)
+        if cost_estimate:
+            await update.message.reply_text(cost_estimate)
+
+        stores = get_store_suggestions(space_type, style)
+        if stores:
+            await update.message.reply_text(stores)
+
+        await update.message.reply_text(
+            t(update, context, "wallet_prompt"),
+            reply_markup=result_keyboard(update, context, project_id),
+        )
 
     except Exception as e:
         await update.message.reply_text(t(update, context, "ai_failed"))
@@ -272,20 +396,36 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
 
 
 async def description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message or not update.message.text: return
+    if not update.message or not update.message.text:
+        return
+
     user_text = update.message.text.strip()
-    if not user_text: return
+    if not user_text:
+        return
+
     context.user_data["lang"] = detect_message_lang(user_text)
+
+    if not context.user_data.get("awaiting_description", False):
+        return
+
     await process_request(update, context, user_text)
 
 
 async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message or not update.message.voice: return
-    if "photo_path" not in context.user_data: return await update.message.reply_text(t(update, context, "send_photo_first"))
-    if not context.user_data.get("style"): return await update.message.reply_text(t(update, context, "choose_style_first"))
+    if not update.message or not update.message.voice:
+        return
+
+    if "photo_path" not in context.user_data:
+        await update.message.reply_text(t(update, context, "send_photo_first"))
+        return
+
+    if not context.user_data.get("style"):
+        await update.message.reply_text(t(update, context, "choose_style_first"))
+        return
 
     await update.message.reply_text(t(update, context, "voice_processing"))
     os.makedirs(UPLOAD_DIR, exist_ok=True)
+
     voice_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}_voice.ogg")
     tg_file = await context.bot.get_file(update.message.voice.file_id)
     await tg_file.download_to_drive(voice_path)
@@ -296,43 +436,70 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         context.user_data["awaiting_description"] = True
         await update.message.reply_text(transcribed_text)
         await process_request(update, context, transcribed_text)
-    except Exception as e:
+    except Exception:
         await update.message.reply_text(t(update, context, "voice_failed"))
 
 
 async def handle_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
+    if not query:
+        return
     await query.answer()
     data = query.data
 
     if data == "redo":
         context.user_data["awaiting_description"] = True
         await query.message.reply_text(t(update, context, "ask_change"))
+
     elif data == "change_style":
         context.user_data["awaiting_description"] = False
         context.user_data["style"] = None
         context.user_data["time_of_day"] = None
         context.user_data["weather"] = None
-        await query.message.reply_text(t(update, context, "choose_style"), reply_markup=style_keyboard(update, context))
+        await query.message.reply_text(
+            t(update, context, "choose_style"),
+            reply_markup=style_keyboard(update, context),
+        )
+
     elif data == "mint_hint":
         image_path = context.user_data.get("last_generated_image")
         project_id = context.user_data.get("last_project_id", "unknown")
         style = context.user_data.get("last_style", "modern")
-        if not image_path or not os.path.exists(image_path): return await query.message.reply_text("❌ خطا: عکسی پیدا نشد.")
-        
+
+        if not image_path or (not str(image_path).startswith("http") and not os.path.exists(image_path)):
+            await query.message.reply_text("❌ خطا: عکسی پیدا نشد.")
+            return
+
         await query.message.reply_text("⏳ در حال انتقال تصویر به فضای غیرمتمرکز (IPFS)...")
+
         try:
             from nft import create_mint_request
-            mint_data = create_mint_request(project_id=project_id, owner_wallet="Pending_Wallet_Connect", title=f"ArchAgent Design - {style.capitalize()}", description="AI-generated architectural redesign.", local_image_path=image_path)
-            await query.message.reply_text(f"✅ فایل‌های شما با موفقیت پین شدند!\n\n🔗 لینک متادیتا:\n{mint_data['metadata_url']}\n\n💎 لطفاً از طریق دکمه 'پنل TON' کیف پول خود را متصل کنید.")
+
+            mint_data = create_mint_request(
+                project_id=project_id,
+                owner_wallet="Pending_Wallet_Connect",
+                title=f"ArchAgent Design - {style.capitalize()}",
+                description="AI-generated architectural redesign.",
+                local_image_path=image_path,
+            )
+
+            await query.message.reply_text(
+                f"✅ فایل‌های شما با موفقیت پین شدند!\n\n"
+                f"🔗 لینک متادیتا:\n{mint_data['metadata_url']}\n\n"
+                f"💎 لطفاً از طریق دکمه 'پنل TON' کیف پول خود را متصل کنید."
+            )
+
         except Exception as e:
             await query.message.reply_text(f"❌ خطا در ساخت NFT:\n{str(e)}")
 
 
 app_web = FastAPI()
 
+
 @app_web.get("/")
-def health(): return {"app": "ArchAgent", "ok": True}
+def health():
+    return {"app": "ArchAgent", "ok": True}
+
 
 @app_web.get("/webapp/index.html")
 def webapp_page():
@@ -377,20 +544,24 @@ def run_api() -> None:
     port = int(os.environ.get("PORT", "10000"))
     uvicorn.run(app_web, host="0.0.0.0", port=port)
 
+
 def main() -> None:
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.PHOTO, photo))
-    
+
     app.add_handler(CallbackQueryHandler(handle_style, pattern="^style_"))
     app.add_handler(CallbackQueryHandler(handle_time, pattern="^time_"))
     app.add_handler(CallbackQueryHandler(handle_weather, pattern="^weather_"))
-    
     app.add_handler(CallbackQueryHandler(handle_actions, pattern="^(redo|change_style|mint_hint)$"))
+
     app.add_handler(MessageHandler(filters.VOICE, voice_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, description))
+
     print("ArchAgent running...")
     app.run_polling(close_loop=False)
+
 
 if __name__ == "__main__":
     threading.Thread(target=run_api, daemon=True).start()
