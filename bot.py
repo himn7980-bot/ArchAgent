@@ -66,19 +66,30 @@ def style_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Inline
         [InlineKeyboardButton(l["arabic"], callback_data="style_arabic")]
     ])
 
-# --- کیبورد جدید برای آب و هوا و زمان ---
-def environment_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
+# --- کیبورد مرحله اول: زمان ---
+def time_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
     lang = get_user_lang(update, context)
     labels = {
-        "en": {"day": "☀️ Day", "night": "🌙 Night", "sunset": "🌅 Sunset", "rain": "🌧 Rain", "snow": "❄️ Snow", "skip": "⏭️ Skip / Default"},
-        "fa": {"day": "☀️ روز", "night": "🌙 شب", "sunset": "🌅 غروب", "rain": "🌧 بارانی", "snow": "❄️ برفی", "skip": "⏭️ بدون تغییر"},
+        "en": {"day": "☀️ Day", "night": "🌙 Night", "sunset": "🌅 Sunset", "skip": "⏭️ Skip"},
+        "fa": {"day": "☀️ روز", "night": "🌙 شب", "sunset": "🌅 غروب", "skip": "⏭️ رد شدن"},
     }
-    l = labels.get(lang, labels["en"]) # اگر زبان دیگر بود پیش‌فرض انگلیسی می‌دهد
-    
+    l = labels.get(lang, labels["en"])
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(l["day"], callback_data="env_day"), InlineKeyboardButton(l["night"], callback_data="env_night")],
-        [InlineKeyboardButton(l["sunset"], callback_data="env_sunset"), InlineKeyboardButton(l["rain"], callback_data="env_rain")],
-        [InlineKeyboardButton(l["snow"], callback_data="env_snow"), InlineKeyboardButton(l["skip"], callback_data="env_skip")]
+        [InlineKeyboardButton(l["day"], callback_data="time_day"), InlineKeyboardButton(l["night"], callback_data="time_night")],
+        [InlineKeyboardButton(l["sunset"], callback_data="time_sunset"), InlineKeyboardButton(l["skip"], callback_data="time_skip")]
+    ])
+
+# --- کیبورد مرحله دوم: آب و هوا ---
+def weather_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
+    lang = get_user_lang(update, context)
+    labels = {
+        "en": {"clear": "🌤 Clear", "rain": "🌧 Rain", "snow": "❄️ Snow", "skip": "⏭️ Skip"},
+        "fa": {"clear": "🌤 صاف", "rain": "🌧 بارانی", "snow": "❄️ برفی", "skip": "⏭️ رد شدن"},
+    }
+    l = labels.get(lang, labels["en"])
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(l["clear"], callback_data="weather_clear"), InlineKeyboardButton(l["rain"], callback_data="weather_rain")],
+        [InlineKeyboardButton(l["snow"], callback_data="weather_snow"), InlineKeyboardButton(l["skip"], callback_data="weather_skip")]
     ])
 
 
@@ -95,7 +106,7 @@ def result_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE, project_
     ])
 
 
-def build_prompt(space_type: str, style: str, environment: str, user_text: str) -> str:
+def build_prompt(space_type: str, style: str, time_of_day: str, weather: str, user_text: str) -> str:
     style_text = {
         "modern": "modern architectural style",
         "classic": "classical architectural style",
@@ -104,14 +115,17 @@ def build_prompt(space_type: str, style: str, environment: str, user_text: str) 
         "arabic": "Middle Eastern / Arabic elegant style",
     }.get(style, "professional design style")
 
-    # ترجمه محیط به دستورات قدرتمند رندر
-    env_text = {
-        "day": "bright clear daylight, sunny, vivid blue sky, sharp crisp shadows",
-        "night": "cinematic night time render, dark sky, glowing warm interior lights, exterior architectural lighting",
-        "sunset": "golden hour lighting, sunset, warm orange and purple sky, dramatic long shadows",
-        "rain": "rainy weather, wet reflective surfaces, overcast moody atmosphere, water puddles",
-        "snow": "snowy winter scene, roof covered in heavy snow, cold atmosphere, soft diffused winter light",
-    }.get(environment, "optimal and realistic architectural lighting")
+    # ترکیب هوشمندانه زمان و آب و هوا
+    env_parts = []
+    if time_of_day == "day": env_parts.append("bright clear daylight, sunny, vivid blue sky, sharp crisp shadows")
+    elif time_of_day == "night": env_parts.append("cinematic night time render, dark sky, glowing warm interior lights, exterior architectural lighting")
+    elif time_of_day == "sunset": env_parts.append("golden hour lighting, sunset, warm orange and purple sky, dramatic long shadows")
+    
+    if weather == "rain": env_parts.append("rainy weather, wet reflective surfaces, overcast moody atmosphere, water puddles")
+    elif weather == "snow": env_parts.append("snowy winter scene, roof covered in heavy snow, cold atmosphere, soft diffused winter light")
+    elif weather == "clear": env_parts.append("clear clean weather")
+
+    env_text = ", ".join(env_parts) if env_parts else "optimal and realistic architectural lighting"
 
     common_rules = f"""
 User request: {user_text}
@@ -165,7 +179,7 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ImageDraw.Draw(mask_canvas).rectangle([50, 50, target_size - 50, target_size - 50], fill=(0, 0, 0, 0))
     mask_canvas.save(mask_path, "PNG")
 
-    context.user_data.update({"photo_path": image_path, "mask_path": mask_path, "space_type": "interior", "style": None, "environment": None, "awaiting_description": False})
+    context.user_data.update({"photo_path": image_path, "mask_path": mask_path, "space_type": "interior", "style": None, "time_of_day": None, "weather": None, "awaiting_description": False})
 
     await update.message.reply_text(t(update, context, "photo_received"))
 
@@ -183,23 +197,35 @@ async def handle_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     mapping = {"style_modern": "modern", "style_classic": "classic", "style_minimal": "minimal", "style_luxury": "luxury", "style_arabic": "arabic"}
     selected_style = mapping.get(query.data)
-
     if not selected_style: return
 
     context.user_data["style"] = selected_style
     
-    # تغییر بزرگ: به جای درخواست مستقیم متن، اول محیط را می‌پرسیم
+    # رفتن به مرحله انتخاب زمان
     lang = get_user_lang(update, context)
-    msg = "حالا زمان و آب‌و‌هوا را برای رندر انتخاب کنید 🌤🌙:" if lang == "fa" else "Now select the lighting and weather 🌤🌙:"
-    await query.message.reply_text(msg, reply_markup=environment_keyboard(update, context))
+    msg = "حالا زمان رندر را انتخاب کنید ☀️🌙:" if lang == "fa" else "Now select the time of day ☀️🌙:"
+    await query.message.reply_text(msg, reply_markup=time_keyboard(update, context))
 
-# --- کنترلر جدید برای مدیریت دکمه‌های آب و هوا ---
-async def handle_environment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+async def handle_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     
-    env = query.data.replace("env_", "")
-    context.user_data["environment"] = env if env != "skip" else None
+    selected_time = query.data.replace("time_", "")
+    context.user_data["time_of_day"] = selected_time if selected_time != "skip" else None
+    
+    # رفتن به مرحله انتخاب آب و هوا
+    lang = get_user_lang(update, context)
+    msg = "و در نهایت شرایط آب‌و‌هوا را انتخاب کنید 🌧❄️:" if lang == "fa" else "Finally, select the weather condition 🌧❄️:"
+    await query.message.reply_text(msg, reply_markup=weather_keyboard(update, context))
+
+
+async def handle_weather(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    
+    selected_weather = query.data.replace("weather_", "")
+    context.user_data["weather"] = selected_weather if selected_weather != "skip" else None
     context.user_data["awaiting_description"] = True
     
     await query.message.reply_text(t(update, context, "ask_change"))
@@ -209,7 +235,8 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
     photo_path = context.user_data.get("photo_path")
     mask_path = context.user_data.get("mask_path")
     style = context.user_data.get("style")
-    environment = context.user_data.get("environment") # گرفتن متغیر آب و هوا
+    time_of_day = context.user_data.get("time_of_day")
+    weather = context.user_data.get("weather")
     awaiting_description = context.user_data.get("awaiting_description", False)
 
     if not photo_path or not os.path.exists(photo_path): return await update.message.reply_text(t(update, context, "send_photo_first"))
@@ -220,8 +247,8 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
     await update.message.reply_text(t(update, context, "generating"))
 
     try:
-        # ارسال آب و هوا به پرامپت
-        prompt = build_prompt(space_type, style, environment, user_text)
+        # ساخت پرامپت با در نظر گرفتن زمان و آب‌وهوا به صورت مجزا
+        prompt = build_prompt(space_type, style, time_of_day, weather, user_text)
         generated_image = generate_design(photo_path, mask_path, prompt)
 
         project_id = create_project(str(update.effective_user.id), {"space_type": space_type, "style": style, "request_text": user_text, "source_image": photo_path, "generated_image": generated_image})
@@ -284,7 +311,8 @@ async def handle_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     elif data == "change_style":
         context.user_data["awaiting_description"] = False
         context.user_data["style"] = None
-        context.user_data["environment"] = None
+        context.user_data["time_of_day"] = None
+        context.user_data["weather"] = None
         await query.message.reply_text(t(update, context, "choose_style"), reply_markup=style_keyboard(update, context))
     elif data == "mint_hint":
         image_path = context.user_data.get("last_generated_image")
@@ -306,7 +334,6 @@ app_web = FastAPI()
 @app_web.get("/")
 def health(): return {"app": "ArchAgent", "ok": True}
 
-# --- پنل Web3 ادغام شده برای اتصال کیف پول TON ---
 @app_web.get("/webapp/index.html")
 def webapp_page():
     html_content = """
@@ -354,10 +381,10 @@ def main() -> None:
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.PHOTO, photo))
-    app.add_handler(CallbackQueryHandler(handle_style, pattern="^style_"))
     
-    # --- هندلر جدید برای دریافت کلیک‌های آب و هوا ---
-    app.add_handler(CallbackQueryHandler(handle_environment, pattern="^env_"))
+    app.add_handler(CallbackQueryHandler(handle_style, pattern="^style_"))
+    app.add_handler(CallbackQueryHandler(handle_time, pattern="^time_"))
+    app.add_handler(CallbackQueryHandler(handle_weather, pattern="^weather_"))
     
     app.add_handler(CallbackQueryHandler(handle_actions, pattern="^(redo|change_style|mint_hint)$"))
     app.add_handler(MessageHandler(filters.VOICE, voice_message))
