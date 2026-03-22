@@ -45,6 +45,7 @@ def get_user_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     saved_lang = context.user_data.get("lang")
     if saved_lang:
         return saved_lang
+
     lang = (update.effective_user.language_code or "en").lower()
     if lang.startswith("fa"):
         return "fa"
@@ -109,8 +110,24 @@ def style_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Inline
 def time_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
     lang = get_user_lang(update, context)
     labels = {
-        "en": {"day": "☀️ Day", "night": "🌙 Night", "sunset": "🌅 Sunset", "skip": "⏭️ Skip"},
-        "fa": {"day": "☀️ روز", "night": "🌙 شب", "sunset": "🌅 غروب", "skip": "⏭️ رد شدن"},
+        "en": {
+            "day": "☀️ Day",
+            "night": "🌙 Night",
+            "sunset": "🌅 Sunset",
+            "skip": "⏭️ Skip",
+        },
+        "fa": {
+            "day": "☀️ روز",
+            "night": "🌙 شب",
+            "sunset": "🌅 غروب",
+            "skip": "⏭️ رد شدن",
+        },
+        "ar": {
+            "day": "☀️ نهار",
+            "night": "🌙 ليل",
+            "sunset": "🌅 غروب",
+            "skip": "⏭️ تخطي",
+        },
     }
     l = labels.get(lang, labels["en"])
     return InlineKeyboardMarkup([
@@ -128,8 +145,24 @@ def time_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineK
 def weather_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
     lang = get_user_lang(update, context)
     labels = {
-        "en": {"clear": "🌤 Clear", "rain": "🌧 Rain", "snow": "❄️ Snow", "skip": "⏭️ Skip"},
-        "fa": {"clear": "🌤 صاف", "rain": "🌧 بارانی", "snow": "❄️ برفی", "skip": "⏭️ رد شدن"},
+        "en": {
+            "clear": "🌤 Clear",
+            "rain": "🌧 Rain",
+            "snow": "❄️ Snow",
+            "skip": "⏭️ Skip",
+        },
+        "fa": {
+            "clear": "🌤 صاف",
+            "rain": "🌧 بارانی",
+            "snow": "❄️ برفی",
+            "skip": "⏭️ رد شدن",
+        },
+        "ar": {
+            "clear": "🌤 صافي",
+            "rain": "🌧 مطر",
+            "snow": "❄️ ثلج",
+            "skip": "⏭️ تخطي",
+        },
     }
     l = labels.get(lang, labels["en"])
     return InlineKeyboardMarkup([
@@ -147,8 +180,18 @@ def weather_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Inli
 def result_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE, project_id: str) -> InlineKeyboardMarkup:
     lang = get_user_lang(update, context)
     labels = {
-        "en": {"redo": "🔁 Regenerate", "style": "🎨 Change Style", "pay": "💰 TON Panel", "mint": "🖼 Mint NFT"},
-        "fa": {"redo": "🔁 تغییر طرح", "style": "🎨 تغییر سبک", "pay": "💰 پنل TON", "mint": "🖼 مینت NFT"},
+        "en": {
+            "redo": "🔁 Regenerate",
+            "style": "🎨 Change Style",
+            "pay": "💰 TON Panel",
+            "mint": "🖼 Mint NFT",
+        },
+        "fa": {
+            "redo": "🔁 تغییر طرح",
+            "style": "🎨 تغییر سبک",
+            "pay": "💰 پنل TON",
+            "mint": "🖼 مینت NFT",
+        },
     }
     l = labels.get(lang, labels["en"])
     return InlineKeyboardMarkup([
@@ -174,7 +217,7 @@ def normalize_space_type(space_type: str, user_text: str) -> str:
 
     kitchen_keywords = ["kitchen", "آشپزخانه", "مطبخ"]
     bathroom_keywords = ["bathroom", "حمام", "سرویس"]
-    living_keywords = ["living room", "پذیرایی", "نشیمن", "هال"]
+    living_keywords = ["living room", "living_room", "پذیرایی", "نشیمن", "هال"]
 
     if any(k in text for k in kitchen_keywords):
         return "kitchen"
@@ -203,6 +246,7 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     tg_file = await context.bot.get_file(photo_file.file_id)
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
+
     temp_jpg_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.jpg")
     image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.png")
     mask_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}_mask.png")
@@ -215,6 +259,7 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         scale = min(target_size / img.size[0], target_size / img.size[1])
         new_width = int(img.size[0] * scale)
         new_height = int(img.size[1] * scale)
+
         resized = img.resize((new_width, new_height), Image.LANCZOS)
 
         canvas = Image.new("RGBA", (target_size, target_size), (255, 255, 255, 255))
@@ -223,6 +268,7 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         canvas.paste(resized, (paste_x, paste_y), resized)
         canvas.save(image_path, "PNG")
 
+    # Mask ساده برای شروع
     mask_canvas = Image.new("RGBA", (target_size, target_size), (0, 0, 0, 255))
     draw = ImageDraw.Draw(mask_canvas)
     draw.rectangle([50, 50, target_size - 50, target_size - 50], fill=(0, 0, 0, 0))
@@ -424,9 +470,10 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     await update.message.reply_text(t(update, context, "voice_processing"))
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
     voice_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}_voice.ogg")
+
     tg_file = await context.bot.get_file(update.message.voice.file_id)
     await tg_file.download_to_drive(voice_path)
 
@@ -445,6 +492,7 @@ async def handle_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not query:
         return
     await query.answer()
+
     data = query.data
 
     if data == "redo":
@@ -456,6 +504,7 @@ async def handle_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data["style"] = None
         context.user_data["time_of_day"] = None
         context.user_data["weather"] = None
+
         await query.message.reply_text(
             t(update, context, "choose_style"),
             reply_markup=style_keyboard(update, context),
