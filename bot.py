@@ -478,11 +478,16 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await tg_file.download_to_drive(voice_path)
 
     try:
-        transcribed_text = transcribe_voice(voice_path)
-        context.user_data["lang"] = detect_message_lang(transcribed_text)
+        transcription = transcribe_voice(voice_path)
+        transcribed_text = transcription["text"]
+        detected_lang = transcription["language"]
+
+        context.user_data["lang"] = detected_lang
         context.user_data["awaiting_description"] = True
+
         await update.message.reply_text(transcribed_text)
         await process_request(update, context, transcribed_text)
+
     except Exception:
         await update.message.reply_text(t(update, context, "voice_failed"))
 
