@@ -1,6 +1,6 @@
 import os
 import threading
-from PIL import Image, ImageDraw
+from PIL import Image
 
 import uvicorn
 from fastapi import FastAPI
@@ -249,7 +249,6 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     temp_jpg_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.jpg")
     image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.png")
-    mask_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}_mask.png")
 
     await tg_file.download_to_drive(temp_jpg_path)
 
@@ -268,14 +267,9 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         canvas.paste(resized, (paste_x, paste_y), resized)
         canvas.save(image_path, "PNG")
 
-    mask_canvas = Image.new("RGBA", (target_size, target_size), (0, 0, 0, 255))
-    draw = ImageDraw.Draw(mask_canvas)
-    draw.rectangle([50, 50, target_size - 50, target_size - 50], fill=(0, 0, 0, 0))
-    mask_canvas.save(mask_path, "PNG")
-
     context.user_data.update({
         "photo_path": image_path,
-        "mask_path": mask_path,
+        "mask_path": None,
         "space_type": "interior",
         "style": None,
         "time_of_day": None,
@@ -385,6 +379,9 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
             weather=weather,
             user_text=user_text,
         )
+
+        # فقط برای تست موقت
+        await update.message.reply_text(prompt[:1000])
 
         generated_image = generate_design(photo_path, mask_path, prompt)
 
