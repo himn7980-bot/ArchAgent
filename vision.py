@@ -27,7 +27,6 @@ def detect_scene(image_path: str) -> str:
     - exterior
     - unfinished
     """
-
     image_data_url = _image_to_data_url(image_path)
 
     system_prompt = """
@@ -84,7 +83,6 @@ Return only one label and nothing else.
         if text in allowed:
             return text
 
-        # fallback safety
         if "kitchen" in text:
             return "kitchen"
         if "bathroom" in text:
