@@ -268,7 +268,6 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         canvas.paste(resized, (paste_x, paste_y), resized)
         canvas.save(image_path, "PNG")
 
-    # Mask ساده برای شروع
     mask_canvas = Image.new("RGBA", (target_size, target_size), (0, 0, 0, 255))
     draw = ImageDraw.Draw(mask_canvas)
     draw.rectangle([50, 50, target_size - 50, target_size - 50], fill=(0, 0, 0, 0))
