@@ -24,6 +24,9 @@ TEXTS = {
         "voice_processing": "Processing your voice message...",
         "voice_failed": "Voice processing failed.",
         "ai_failed": "AI generation failed.",
+        "materials_title": "Suggested materials:",
+        "cost_title": "Estimated cost range:",
+        "stores_title": "Suggested nearby store types:",
     },
 
     "fa": {
@@ -51,6 +54,9 @@ TEXTS = {
         "voice_processing": "در حال پردازش پیام صوتی...",
         "voice_failed": "پردازش ویس ناموفق بود.",
         "ai_failed": "تولید طرح با هوش مصنوعی ناموفق بود.",
+        "materials_title": "متریال پیشنهادی:",
+        "cost_title": "بازه تقریبی هزینه:",
+        "stores_title": "نوع فروشگاه‌های پیشنهادی نزدیک:",
     },
 
     "ar": {
@@ -78,6 +84,9 @@ TEXTS = {
         "voice_processing": "جاري معالجة الرسالة الصوتية...",
         "voice_failed": "فشلت معالجة الرسالة الصوتية.",
         "ai_failed": "فشل إنشاء التصميم بالذكاء الاصطناعي.",
+        "materials_title": "المواد المقترحة:",
+        "cost_title": "نطاق التكلفة التقريبي:",
+        "stores_title": "أنواع المتاجر المقترحة القريبة:",
     },
 
     "ru": {
@@ -105,5 +114,8 @@ TEXTS = {
         "voice_processing": "Обрабатываю голосовое сообщение...",
         "voice_failed": "Не удалось обработать голосовое сообщение.",
         "ai_failed": "Не удалось сгенерировать дизайн с помощью ИИ.",
+        "materials_title": "Рекомендуемые материалы:",
+        "cost_title": "Примерный диапазон стоимости:",
+        "stores_title": "Рекомендуемые типы магазинов поблизости:",
     },
 }
