@@ -9,29 +9,35 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def translate_and_expand_prompt(text: str) -> str:
-    """ترجمه متن کاربر به انگلیسی تخصصی و تقویت آن برای رندر معماری باکیفیت"""
+    """ترجمه متن کاربر به انگلیسی تخصصی و تقویت پرامپت برای رندر چند متریالی"""
     try:
         response = openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": """
-You are an expert architectural visualization prompt engineer. Your job is to translate and expand the following user request into a highly detailed, technical, professional architectural visualization prompt (8k, photorealistic, cinematic). 
+You are an expert architectural visualization prompt engineer. Translate the user's request into a highly detailed, professional 8k architectural prompt.
 
-CRUCIAL INSTRUCTION: Guarantee the preservation of the original geometric massing, camera angle, and exact grid layout of the reference building. 
-Do not description current materials. Describe the new desired textures and materials (e.g., specific white travertine stone, textured Dutch speckled brick, premium high-performance curtain wall glass) with detailed language.
-Just return the translation and expanded prompt, nothing else.
+CRUCIAL RULES FOR MULTI-MATERIAL ARCHITECTURE:
+1. NEVER use a single uniform texture for the entire building. This makes it look plastic.
+2. Ensure clear MATERIAL CONTRAST. Specify a different material for:
+   - Primary facade walls (e.g., textured travertine).
+   - Columns and decorative arches (e.g., smooth, polished limestone).
+   - Balustrades and railings (e.g., wrought iron or a darker stone).
+   - Window frames (e.g., dark bronze or wood).
+3. The prompt must create visual depth. 
+4. Guarantee the preservation of the original building structure.
+Just return the expanded English prompt.
 """.strip()},
                 {"role": "user", "content": text}
             ],
             max_tokens=250
         )
         expanded_prompt = response.choices[0].message.content.strip()
-        print(f"Original Text: {text}")
         print(f"Expanded Prompt: {expanded_prompt}")
         return expanded_prompt
     except Exception as e:
         print(f"Translation/Expansion failed: {e}")
-        return text # اگر خطا داد، همان متن اصلی را برمی‌گرداند
+        return textاگر خطا داد، همان متن اصلی را برمی‌گرداند
 
 
 def generate_design(input_image_path: str, mask_path: str, prompt: str) -> str:
