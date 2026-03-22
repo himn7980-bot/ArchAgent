@@ -80,7 +80,6 @@ premium materials, windows, balconies, and lighting
         env_parts = []
 
         is_interior = space_type in {"kitchen", "bathroom", "living_room", "interior"}
-        is_exterior = space_type in {"exterior", "unfinished"}
 
         if time_of_day == "day":
             if is_interior:
@@ -177,19 +176,26 @@ No text, no logo, no watermark, no distorted lines, no warped windows, no broken
 no duplicated facade elements, no cartoon look, no plastic materials, no unrealistic artifacts.
 """.strip()
 
+        transformation_rules = """
+The redesign must be clearly visible.
+Apply a strong and obvious transformation according to the user's request.
+Do not keep the original color palette or original materials if the user asked for change.
+Make the requested new style, colors, lighting, and mood clearly noticeable in the final image.
+""".strip()
+
         if is_interior:
             preserve_rules = """
-Preserve the original room layout, spatial proportions, and camera angle.
-Allow material, lighting, atmosphere, and style transformation.
+Preserve only the room layout, proportions, and camera angle.
+It is allowed to visibly change cabinetry, finishes, walls, flooring, countertops, lighting, and color palette.
 """.strip()
         elif is_exterior:
             preserve_rules = """
 Preserve the main building massing, facade proportions, and camera perspective.
-Allow strong facade redesign, material upgrades, lighting transformation, and atmospheric change.
+It is allowed to visibly change facade materials, windows, balconies, lighting, and atmosphere.
 """.strip()
         else:
             preserve_rules = """
-Preserve the main composition and camera perspective unless the user explicitly asks for structural change.
+Preserve the main composition and camera perspective unless structural change is explicitly requested.
 """.strip()
 
         prompt = f"""
@@ -207,6 +213,9 @@ Lighting and Environment:
 
 User Request:
 {user_text}
+
+Transformation Rules:
+{transformation_rules}
 
 Material Rules:
 {material_rules}
