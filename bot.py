@@ -17,7 +17,7 @@ from telegram.ext import (
 
 from config import BOT_TOKEN, MINIAPP_URL, UPLOAD_DIR
 from design import generate_design
-from vision import detect_scene
+from vision import detect_scene, translate_request_to_english
 from voice import transcribe_voice
 from texts import TEXTS
 from materials import suggest_materials
@@ -110,24 +110,9 @@ def style_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Inline
 def time_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
     lang = get_user_lang(update, context)
     labels = {
-        "en": {
-            "day": "☀️ Day",
-            "night": "🌙 Night",
-            "sunset": "🌅 Sunset",
-            "skip": "⏭️ Skip",
-        },
-        "fa": {
-            "day": "☀️ روز",
-            "night": "🌙 شب",
-            "sunset": "🌅 غروب",
-            "skip": "⏭️ رد شدن",
-        },
-        "ar": {
-            "day": "☀️ نهار",
-            "night": "🌙 ليل",
-            "sunset": "🌅 غروب",
-            "skip": "⏭️ تخطي",
-        },
+        "en": {"day": "☀️ Day", "night": "🌙 Night", "sunset": "🌅 Sunset", "skip": "⏭️ Skip"},
+        "fa": {"day": "☀️ روز", "night": "🌙 شب", "sunset": "🌅 غروب", "skip": "⏭️ رد شدن"},
+        "ar": {"day": "☀️ نهار", "night": "🌙 ليل", "sunset": "🌅 غروب", "skip": "⏭️ تخطي"},
     }
     l = labels.get(lang, labels["en"])
     return InlineKeyboardMarkup([
@@ -145,24 +130,9 @@ def time_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineK
 def weather_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
     lang = get_user_lang(update, context)
     labels = {
-        "en": {
-            "clear": "🌤 Clear",
-            "rain": "🌧 Rain",
-            "snow": "❄️ Snow",
-            "skip": "⏭️ Skip",
-        },
-        "fa": {
-            "clear": "🌤 صاف",
-            "rain": "🌧 بارانی",
-            "snow": "❄️ برفی",
-            "skip": "⏭️ رد شدن",
-        },
-        "ar": {
-            "clear": "🌤 صافي",
-            "rain": "🌧 مطر",
-            "snow": "❄️ ثلج",
-            "skip": "⏭️ تخطي",
-        },
+        "en": {"clear": "🌤 Clear", "rain": "🌧 Rain", "snow": "❄️ Snow", "skip": "⏭️ Skip"},
+        "fa": {"clear": "🌤 صاف", "rain": "🌧 بارانی", "snow": "❄️ برفی", "skip": "⏭️ رد شدن"},
+        "ar": {"clear": "🌤 صافي", "rain": "🌧 مطر", "snow": "❄️ ثلج", "skip": "⏭️ تخطي"},
     }
     l = labels.get(lang, labels["en"])
     return InlineKeyboardMarkup([
@@ -180,18 +150,9 @@ def weather_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Inli
 def result_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE, project_id: str) -> InlineKeyboardMarkup:
     lang = get_user_lang(update, context)
     labels = {
-        "en": {
-            "redo": "🔁 Regenerate",
-            "style": "🎨 Change Style",
-            "pay": "💰 TON Panel",
-            "mint": "🖼 Mint NFT",
-        },
-        "fa": {
-            "redo": "🔁 تغییر طرح",
-            "style": "🎨 تغییر سبک",
-            "pay": "💰 پنل TON",
-            "mint": "🖼 مینت NFT",
-        },
+        "en": {"redo": "🔁 Regenerate", "style": "🎨 Change Style", "pay": "💰 TON Panel", "mint": "🖼 Mint NFT"},
+        "fa": {"redo": "🔁 تغییر طرح", "style": "🎨 تغییر سبک", "pay": "💰 پنل TON", "mint": "🖼 مینت NFT"},
+        "ar": {"redo": "🔁 إعادة التصميم", "style": "🎨 تغيير النمط", "pay": "💰 لوحة TON", "mint": "🖼 سك NFT"},
     }
     l = labels.get(lang, labels["en"])
     return InlineKeyboardMarkup([
@@ -230,6 +191,25 @@ def normalize_space_type(space_type: str, user_text: str) -> str:
         return st
 
     return "interior"
+
+
+def format_list_block(update: Update, context: ContextTypes.DEFAULT_TYPE, title_key: str, items) -> str:
+    if not items:
+        return ""
+
+    title = t(update, context, title_key)
+
+    if isinstance(items, list):
+        lines = "\n".join(f"- {item}" for item in items)
+        return f"{title}\n{lines}"
+
+    return f"{title}\n{items}"
+
+
+def format_cost_block(update: Update, context: ContextTypes.DEFAULT_TYPE, cost_value) -> str:
+    if not cost_value:
+        return ""
+    return f"{t(update, context, 'cost_title')}\n{cost_value}"
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -372,16 +352,15 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
     await update.message.reply_text(t(update, context, "generating"))
 
     try:
+        english_request = translate_request_to_english(user_text)
+
         prompt = PromptEngine.build_final_prompt(
             space_type=space_type,
             style=style,
             time_of_day=time_of_day,
             weather=weather,
-            user_text=user_text,
+            user_text=english_request,
         )
-
-        # فقط برای تست موقت
-        await update.message.reply_text(prompt[:1000])
 
         generated_image = generate_design(photo_path, mask_path, prompt)
 
@@ -393,6 +372,7 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
                 "time_of_day": time_of_day,
                 "weather": weather,
                 "request_text": user_text,
+                "request_text_en": english_request,
                 "source_image": photo_path,
                 "generated_image": generated_image,
             },
@@ -416,16 +396,19 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
         context.user_data["awaiting_description"] = False
 
         materials = suggest_materials(space_type, style)
-        if materials:
-            await update.message.reply_text(materials)
+        material_msg = format_list_block(update, context, "materials_title", materials)
+        if material_msg:
+            await update.message.reply_text(material_msg)
 
         cost_estimate = estimate_cost(space_type, style)
-        if cost_estimate:
-            await update.message.reply_text(cost_estimate)
+        cost_msg = format_cost_block(update, context, cost_estimate)
+        if cost_msg:
+            await update.message.reply_text(cost_msg)
 
         stores = get_store_suggestions(space_type, style)
-        if stores:
-            await update.message.reply_text(stores)
+        store_msg = format_list_block(update, context, "stores_title", stores)
+        if store_msg:
+            await update.message.reply_text(store_msg)
 
         await update.message.reply_text(
             t(update, context, "wallet_prompt"),
