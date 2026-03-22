@@ -18,15 +18,6 @@ def _image_to_data_url(image_path: str) -> str:
 
 
 def detect_scene(image_path: str) -> str:
-    """
-    Returns one of:
-    - kitchen
-    - bathroom
-    - living_room
-    - interior
-    - exterior
-    - unfinished
-    """
     image_data_url = _image_to_data_url(image_path)
 
     system_prompt = """
@@ -64,14 +55,8 @@ Return only one label and nothing else.
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "input_text",
-                            "text": "Classify this architectural image.",
-                        },
-                        {
-                            "type": "input_image",
-                            "image_url": image_data_url,
-                        },
+                        {"type": "input_text", "text": "Classify this architectural image."},
+                        {"type": "input_image", "image_url": image_data_url},
                     ],
                 },
             ],
@@ -98,3 +83,42 @@ Return only one label and nothing else.
 
     except Exception:
         return "interior"
+
+
+def translate_request_to_english(user_text: str) -> str:
+    """
+    Turn user's raw request into a short, clear English architectural edit request
+    for image generation.
+    """
+    if not user_text or not user_text.strip():
+        return ""
+
+    system_prompt = """
+You convert architectural edit requests into clear English prompts for image generation.
+
+Rules:
+- Return only English.
+- Keep the meaning exactly.
+- Keep color, style, material, lighting, weather, and time-of-day instructions.
+- Make it concise and image-generation friendly.
+- Do not explain anything.
+""".strip()
+
+    try:
+        response = client.responses.create(
+            model=VISION_MODEL,
+            input=[
+                {
+                    "role": "system",
+                    "content": [{"type": "input_text", "text": system_prompt}],
+                },
+                {
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": user_text.strip()}],
+                },
+            ],
+        )
+        text = (response.output_text or "").strip()
+        return text if text else user_text
+    except Exception:
+        return user_text
