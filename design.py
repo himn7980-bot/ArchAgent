@@ -1,6 +1,5 @@
 import os
 from typing import Optional, Union
-
 import requests
 
 from config import (
@@ -10,7 +9,6 @@ from config import (
     STABILITY_OUTPUT_FORMAT,
     STABILITY_SEED,
     STABILITY_CFG_SCALE,
-    STABILITY_STRENGTH,
     OUTPUT_DIR,
 )
 
@@ -18,6 +16,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 def _build_endpoint() -> str:
+    # برای معماری، این آدرس باید به control/structure ختم شود
     model_path = STABILITY_IMAGE_MODEL.strip().lstrip("/")
     return f"{STABILITY_API_HOST}/v2beta/{model_path}"
 
@@ -28,10 +27,10 @@ def _validate_file(path: str, label: str) -> None:
 
 
 def _normalize_output_format(fmt: str) -> str:
-    fmt = (fmt or "png").strip().lower()
+    fmt = (fmt or "jpeg").strip().lower()
     if fmt in {"png", "jpeg", "webp"}:
         return fmt
-    return "png"
+    return "jpeg"
 
 
 def _normalize_seed(seed: int) -> int:
@@ -40,14 +39,6 @@ def _normalize_seed(seed: int) -> int:
     except Exception:
         return 0
     return max(0, seed)
-
-
-def _normalize_cfg_scale(value: float) -> str:
-    try:
-        value = float(value)
-    except Exception:
-        value = 7.0
-    return str(value)
 
 
 def _save_binary_output(content: bytes, output_format: str) -> str:
@@ -59,7 +50,6 @@ def _save_binary_output(content: bytes, output_format: str) -> str:
 
 
 def _raise_api_error(response: requests.Response) -> None:
-    text = ""
     try:
         text = response.text
     except Exception:
@@ -84,13 +74,13 @@ def generate_design(input_image_path: str, mask_path: Optional[str], prompt_data
     if mask_path:
         _validate_file(mask_path, "Mask image")
 
-    # استخراج پرامپت مثبت و منفی (پشتیبانی از فرمت جدید)
+    # استخراج پرامپت مثبت و منفی
     if isinstance(prompt_data, dict):
         positive_prompt = prompt_data.get("prompt", "").strip()
         negative_prompt = prompt_data.get("negative_prompt", "").strip()
     else:
         positive_prompt = str(prompt_data).strip()
-        negative_prompt = "low quality, blurry, distorted" # پیش‌فرض در صورتی که استرینگ پاس داده شود
+        negative_prompt = "cartoon, low quality, bad architecture, warped lines, messy geometry, flat lighting"
 
     if not positive_prompt:
         raise ValueError("Prompt is empty.")
@@ -103,23 +93,25 @@ def generate_design(input_image_path: str, mask_path: Optional[str], prompt_data
         "Accept": "image/*",
     }
 
-    # رفع مشکل اصلی: تنظیم قدرت تغییرات (Strength) روی یک عدد استاندارد معماری
-    # عدد 0.85 اجازه می‌دهد متریال و رنگ‌ها کاملاً عوض شوند اما خطوط اصلی دیوارها حفظ شود.
-    optimal_strength = "0.80"
+    # عدد جادویی برای معماری: 0.65 تا 0.70
+    # این عدد به هوش مصنوعی می‌گوید 65٪ به خطوط عکس وفادار باش و 35٪ متریال و رنگ‌ها را عوض کن.
+    optimal_strength = 0.65
 
     data = {
         "prompt": positive_prompt,
-        "negative_prompt": negative_prompt, # اضافه شدن پرامپت منفی به درخواست
+        "negative_prompt": negative_prompt,
         "output_format": output_format,
         "seed": str(_normalize_seed(STABILITY_SEED)),
-        "cfg_scale": _normalize_cfg_scale(STABILITY_CFG_SCALE),
-        "strength": optimal_strength, # نادیده گرفتن تنظیمات کانفیگ برای تضمین عملکرد
+        # ارسال هر دو پارامتر تا مستقل از نوع Endpoint (Structure یا Img2Img) درست کار کند
+        "strength": str(optimal_strength), 
+        "control_strength": str(optimal_strength),
     }
 
     files = {
         "image": open(input_image_path, "rb"),
     }
 
+    # مدل Control Structure معمولاً ماسک نمی‌گیرد، اما برای Img2Img ارسالش مشکلی ندارد
     if mask_path and os.path.exists(mask_path):
         files["mask"] = open(mask_path, "rb")
 
