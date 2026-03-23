@@ -1,4 +1,5 @@
 import os
+import asyncio
 import threading
 from PIL import Image
 
@@ -50,7 +51,6 @@ def t(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str) -> str:
     return TEXTS.get(lang, TEXTS["en"]).get(key, TEXTS["en"].get(key, key))
 
 def normalize_space_type(space_type: str, user_text: str) -> str:
-    """تشخیص دقیق نوع فضا بر اساس هوش مصنوعی ویژن + متن کاربر"""
     text = (user_text or "").lower()
     if any(k in text for k in ["kitchen", "آشپزخانه", "مطبخ"]): return "kitchen"
     if any(k in text for k in ["bathroom", "حمام", "سرویس"]): return "bathroom"
@@ -95,30 +95,26 @@ def result_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE, project_
 
 async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, user_text: str) -> None:
     data = context.user_data
-    if not data.get("photo_path"): return await update.message.reply_text(t(update, context, "send_photo_first"))
+    if not data.get("photo_path"): 
+        return await update.message.reply_text(t(update, context, "send_photo_first"))
     
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
     await update.message.reply_text(t(update, context, "generating"))
 
     try:
-        # ۱. ترجمه متن و اصلاح فضا
         english_request = translate_request_to_english(user_text)
         space_type = normalize_space_type(data["space_type"], user_text)
         
-        # ۲. ساخت پرامپت حرفه‌ای و رندر
         prompt = PromptEngine.build_final_prompt(space_type, data["style"], data.get("time_of_day"), data.get("weather"), english_request)
         generated_image = generate_design(data["photo_path"], None, prompt)
         
-        # ۳. ذخیره پروژه در دیتابیس لوکال
         project_id = create_project(str(update.effective_user.id), {
             "space_type": space_type, "style": data["style"], "request_text": user_text, "generated_image": generated_image
         })
 
-        # ۴. ارسال تصویر خروجی
         with open(generated_image, "rb") as img:
             await update.message.reply_photo(photo=img, caption=t(update, context, "result_caption"))
 
-        # ۵. ارسال اطلاعات تکمیلی (متریال، هزینه، فروشگاه)
         materials = suggest_materials(space_type, data["style"])
         if materials: await update.message.reply_text(f"🧱 {t(update, context, 'materials_title')}\n- " + "\n- ".join(materials))
         
@@ -128,24 +124,23 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
         stores = get_store_suggestions(space_type, data["style"])
         if stores: await update.message.reply_text(f"🏪 {t(update, context, 'stores_title')}\n- " + "\n- ".join(stores))
 
-        # ۶. ذخیره حافظه برای NFT و ارسال کیبورد نهایی
         data.update({"last_generated_image": generated_image, "last_project_id": project_id, "last_style": data["style"], "awaiting_description": False})
         await update.message.reply_text(t(update, context, "wallet_prompt"), reply_markup=result_keyboard(update, context, project_id))
 
     except Exception as e:
-        await update.message.reply_text(f"❌ {t(update, context, 'ai_failed')}\n{str(e)}")
+        print(f"Error in process_request: {e}")
+        await update.message.reply_text(f"❌ {t(update, context, 'ai_failed')}")
 
-# --- ۴. هندلرهای ورودی (Photo, Voice, Text, Callback) ---
+# --- ۴. هندلرهای ورودی ---
 
-async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    photo_file = update.message.photo[-1]
-    tg_file = await context.bot.get_file(photo_file.file_id)
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.png")
-    
-    # دانلود و تبدیل به Letterbox 1024x1024
-    temp_path = image_path + ".temp"
-    await tg_file.download_to_drive(temp_path)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """هندلر دستور /start"""
+    context.user_data.clear() # پاک کردن حافظه قبلی کاربر
+    welcome_text = t(update, context, "welcome") if hasattr(TEXTS, "welcome") else "سلام! لطفاً یک عکس از فضای مورد نظرت ارسال کن تا طراحیش کنیم. 📸"
+    await update.message.reply_text(welcome_text)
+
+def process_image_sync(temp_path: str, image_path: str):
+    """تابع همگام برای پردازش تصویر با Pillow (برای اجرا در Thread جداگانه)"""
     with Image.open(temp_path) as img:
         img = img.convert("RGBA")
         scale = min(1024/img.size[0], 1024/img.size[1])
@@ -154,25 +149,54 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         canvas = Image.new("RGBA", (1024, 1024), (255, 255, 255, 255))
         canvas.paste(resized, ((1024-new_size[0])//2, (1024-new_size[1])//2), resized)
         canvas.save(image_path, "PNG")
+    
+    # حذف فایل موقت
+    if os.path.exists(temp_path):
+        os.remove(temp_path)
 
-    try: detected = detect_scene(image_path)
-    except: detected = "interior"
+async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    photo_file = update.message.photo[-1]
+    tg_file = await context.bot.get_file(photo_file.file_id)
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    
+    image_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.png")
+    temp_path = image_path + ".temp"
+    
+    await tg_file.download_to_drive(temp_path)
+    
+    # پردازش تصویر در پس‌زمینه (بدون فریز شدن ربات)
+    await asyncio.to_thread(process_image_sync, temp_path, image_path)
+
+    try: 
+        detected = detect_scene(image_path)
+    except Exception as e: 
+        print(f"Vision error: {e}")
+        detected = "interior"
     
     context.user_data.update({"photo_path": image_path, "space_type": detected, "awaiting_description": False})
     await update.message.reply_text(f"{t(update, context, 'photo_received')}\n🔍 {t(update, context, 'scene_detected')} {detected}")
     await update.message.reply_text(t(update, context, "choose_style"), reply_markup=style_keyboard(update, context))
 
 async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not context.user_data.get("photo_path"): return await update.message.reply_text(t(update, context, "send_photo_first"))
+    if not context.user_data.get("photo_path"): 
+        return await update.message.reply_text(t(update, context, "send_photo_first"))
+    
     await update.message.reply_text(t(update, context, "voice_processing"))
-    voice_path = os.path.join(UPLOAD_DIR, f"{update.effective_user.id}.ogg")
+    voice_path = os.path.join(UPLOAD_DIR, f"voice_{update.effective_user.id}.ogg")
     tg_file = await context.bot.get_file(update.message.voice.file_id)
     await tg_file.download_to_drive(voice_path)
+    
     try:
         transcription = transcribe_voice(voice_path)
         await update.message.reply_text(f"🎤 {transcription['text']}")
         await process_request(update, context, transcription['text'])
-    except: await update.message.reply_text(t(update, context, "voice_failed"))
+    except Exception as e: 
+        print(f"Voice processing error: {e}")
+        await update.message.reply_text(t(update, context, "voice_failed"))
+    finally:
+        # حذف فایل صوتی بعد از استفاده
+        if os.path.exists(voice_path):
+            os.remove(voice_path)
 
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -200,7 +224,9 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await query.message.reply_text("⏳ Uploading to IPFS...")
             mint_data = create_mint_request(context.user_data["last_project_id"], "Pending", "ArchAgent Design", "AI on TON", context.user_data["last_generated_image"])
             await query.message.reply_text(f"✅ Pinned!\n{mint_data['metadata_url']}\nConnect wallet in TON Panel.")
-        except Exception as e: await query.message.reply_text(f"NFT Error: {str(e)}")
+        except Exception as e: 
+            print(f"NFT Minting error: {e}")
+            await query.message.reply_text("❌ Error during NFT processing.")
 
 # --- ۵. اجرای سرور و ربات ---
 
@@ -211,13 +237,20 @@ def webapp():
 
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+    
+    # ثبت هندلرها
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.PHOTO, photo))
     app.add_handler(MessageHandler(filters.VOICE, voice_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, lambda u, c: process_request(u, c, u.message.text) if c.user_data.get("awaiting_description") else None))
     app.add_handler(CallbackQueryHandler(handle_callbacks))
     
+    # اجرای FastAPI در یک Thread جداگانه
     threading.Thread(target=lambda: uvicorn.run(app_web, host="0.0.0.0", port=int(os.environ.get("PORT", 10000))), daemon=True).start()
+    
+    # اجرای ربات
+    print("Bot is running...")
     app.run_polling()
 
-if __name__ == "__main__": main()
+if __name__ == "__main__": 
+    main()
