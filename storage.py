@@ -1,6 +1,7 @@
 import json
 import os
 import uuid
+import threading
 from typing import Any, Dict
 
 from config import DATA_DIR
@@ -12,17 +13,24 @@ PROJECTS_FILE = os.path.join(DATA_DIR, "projects.json")
 PAYMENTS_FILE = os.path.join(DATA_DIR, "payments.json")
 NFTS_FILE = os.path.join(DATA_DIR, "nfts.json")
 
+# ساخت یک قفل برای جلوگیری از تداخل ذخیره‌سازی هم‌زمان
+_file_lock = threading.Lock()
 
 def _load(path: str) -> Dict[str, Any]:
-    if not os.path.exists(path):
-        return {}
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    with _file_lock:
+        if not os.path.exists(path):
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return {}  # در صورتی که فایل خراب یا خالی بود، دیکشنری خالی برگرداند
 
 
 def _save(path: str, data: Dict[str, Any]) -> None:
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with _file_lock:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def get_users():
