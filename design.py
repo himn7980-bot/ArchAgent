@@ -1,4 +1,5 @@
 import os
+import random
 from typing import Optional, Union
 import requests
 
@@ -93,18 +94,25 @@ def generate_design(input_image_path: str, mask_path: Optional[str], prompt_data
         "Accept": "image/*",
     }
 
-    # عدد جادویی برای معماری: 0.65 تا 0.70
-    # این عدد به هوش مصنوعی می‌گوید 65٪ به خطوط عکس وفادار باش و 35٪ متریال و رنگ‌ها را عوض کن.
-    optimal_strength = 0.65
+    # --- تنظیمات شوک به هوش مصنوعی ---
+    # پایین آوردن شدید کنترل برای اجبار به تغییر متریال
+    control_val = 0.45  
+    # بالا بردن قدرت تغییر رنگ
+    img2img_val = 0.85  
+
+    # حل مشکل Seed ثابت (تولید عدد تصادفی واقعی اگر در کانفیگ 0 باشد)
+    current_seed = _normalize_seed(STABILITY_SEED)
+    if current_seed == 0:
+        current_seed = random.randint(1000000, 9999999)
 
     data = {
         "prompt": positive_prompt,
         "negative_prompt": negative_prompt,
         "output_format": output_format,
-        "seed": str(_normalize_seed(STABILITY_SEED)),
-        # ارسال هر دو پارامتر تا مستقل از نوع Endpoint (Structure یا Img2Img) درست کار کند
-        "strength": str(optimal_strength), 
-        "control_strength": str(optimal_strength),
+        "seed": str(current_seed),
+        # ارسال هر دو پارامتر تا مستقل از نوع Endpoint درست کار کند
+        "strength": str(img2img_val), 
+        "control_strength": str(control_val),
     }
 
     files = {
