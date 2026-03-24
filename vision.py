@@ -22,7 +22,6 @@ def detect_scene(image_path: str) -> str:
 
     system_prompt = """
 You are an architectural scene classifier.
-
 Classify the image into exactly one of these labels:
 - kitchen
 - bathroom
@@ -31,57 +30,39 @@ Classify the image into exactly one of these labels:
 - exterior
 - unfinished
 
-Rules:
-- Ignore screenshot UI, overlays, social media controls, captions, icons, or watermarks.
-- Focus only on the actual architectural scene.
-- If it is an unfinished/raw concrete or under-construction building, return unfinished.
-- If it is an outdoor building/facade/street view, return exterior.
-- If it is clearly a kitchen, return kitchen.
-- If it is clearly a bathroom, return bathroom.
-- If it is clearly a living room / reception / sitting room, return living_room.
-- Otherwise, if it is indoor, return interior.
-
-Return only one label and nothing else.
+Rules: Return only one label and nothing else.
 """.strip()
 
     try:
-        response = client.responses.create(
+        # سینتکس درست و استاندارد OpenAI برای پردازش تصویر
+        response = client.chat.completions.create(
             model=VISION_MODEL,
-            input=[
-                {
-                    "role": "system",
-                    "content": [{"type": "input_text", "text": system_prompt}],
-                },
+            messages=[
                 {
                     "role": "user",
                     "content": [
-                        {"type": "input_text", "text": "Classify this architectural image."},
-                        {"type": "input_image", "image_url": image_data_url},
-                    ],
-                },
+                        {"type": "text", "text": system_prompt + "\n\nClassify this architectural image."},
+                        {"type": "image_url", "image_url": {"url": image_data_url}}
+                    ]
+                }
             ],
+            max_tokens=10
         )
 
-        text = (response.output_text or "").strip().lower()
+        # استخراج درست متن از جواب OpenAI
+        text = response.choices[0].message.content.strip().lower()
+        print(f"AI Detected Scene: {text}") # چاپ در لاگ سرور برای دیباگ
 
         allowed = {"kitchen", "bathroom", "living_room", "interior", "exterior", "unfinished"}
-        if text in allowed:
-            return text
-
-        if "kitchen" in text:
-            return "kitchen"
-        if "bathroom" in text:
-            return "bathroom"
-        if "living" in text:
-            return "living_room"
-        if "unfinished" in text or "construction" in text or "raw concrete" in text:
-            return "unfinished"
-        if "exterior" in text or "facade" in text or "building" in text:
-            return "exterior"
+        
+        for kw in allowed:
+            if kw in text:
+                return kw
 
         return "interior"
 
-    except Exception:
+    except Exception as e:
+        print(f"Vision API Error: {e}")
         return "interior"
 
 
@@ -95,30 +76,29 @@ def translate_request_to_english(user_text: str) -> str:
 
     system_prompt = """
 You convert architectural edit requests into clear English prompts for image generation.
-
 Rules:
-- Return only English.
-- Keep the meaning exactly.
+- Return ONLY English.
 - Keep color, style, material, lighting, weather, and time-of-day instructions.
 - Make it concise and image-generation friendly.
-- Do not explain anything.
+- Do not explain anything. Just output the translated prompt.
 """.strip()
 
     try:
-        response = client.responses.create(
-            model=VISION_MODEL,
-            input=[
-                {
-                    "role": "system",
-                    "content": [{"type": "input_text", "text": system_prompt}],
-                },
-                {
-                    "role": "user",
-                    "content": [{"type": "input_text", "text": user_text.strip()}],
-                },
+        # سینتکس درست و استاندارد OpenAI برای متن
+        response = client.chat.completions.create(
+            model="gpt-4o-mini", # استفاده از مدل سریع و ارزان برای ترجمه
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_text.strip()}
             ],
+            max_tokens=100
         )
-        text = (response.output_text or "").strip()
-        return text if text else user_text
-    except Exception:
-        return user_text
+        
+        # استخراج درست متن از جواب
+        english_text = response.choices[0].message.content.strip()
+        print(f"Original: {user_text} | Translated: {english_text}") # چاپ در لاگ
+        return english_text
+        
+    except Exception as e:
+        print(f"Translation API Error: {e}")
+        return "Make it look professional and redesigned" # به جای برگرداندن متن فارسی، یک پرامپت جنرال بفرست تا حداقل کار کند
