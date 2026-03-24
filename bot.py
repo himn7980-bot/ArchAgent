@@ -7,6 +7,7 @@ from PIL import Image
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware  # اضافه شدن CORS برای حل مشکل کیف پول
 from openai import AsyncOpenAI
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -343,6 +344,16 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =========================
 
 app_web = FastAPI()
+
+# فعال‌سازی CORS برای رفع قطعی بلاکچین TON
+app_web.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 MY_WALLET_ADDRESS = "UQDPVUpClyvBg0GXnl-IHVB6Q5I_CRp-psFhkasI-uPMpUfm"
 
 @app_web.get("/")
@@ -431,9 +442,9 @@ def webapp():
 
             async function buyPackage(pkgType, priceTon) {{
                 try {{
-                    const nanoTon = parseFloat(priceTon) * 1000000000;
+                    // حل مشکل اعشار با Math.floor
+                    const nanoTon = Math.floor(parseFloat(priceTon) * 1000000000);
                     
-                    // دقت کن! بخش payload کاملاً از اینجا حذف شده تا تراکنش فوری قبول بشه
                     const transaction = {{
                         validUntil: Math.floor(Date.now() / 1000) + 360,
                         messages: [{{
@@ -451,6 +462,8 @@ def webapp():
                     tg.sendData(JSON.stringify({{action: "payment_success", package: pkgType}}));
                     
                 }} catch (e) {{
+                    // الان اگر اروری رخ بده، دقیقاً دلیل فنیش رو بهمون پاپ‌آپ میده
+                    alert("⚠️ Error Details: " + e.message); 
                     document.getElementById('status-msg').style.color = "#FF5252";
                     document.getElementById('status-msg').innerText = "❌ Payment failed or cancelled.";
                 }}
