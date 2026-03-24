@@ -49,16 +49,12 @@ class PromptEngine:
         space_text = cls.get_space_details(space_type)
         env_text = cls.get_environment_details(time_of_day, weather, space_type)
 
-        # 👈 تغییر حیاتی: حذف پرانتزها و جایگزینی با دستور متنی صریح برای جلوگیری از کرش موتور
         user_focus = f"CRITICAL REQUIREMENT: {user_text}, " if user_text else ""
 
-        # ساخت پرامپت مثبت یکپارچه
         positive_prompt = f"{user_focus}{space_text}, {style_text}, {env_text}, Hyper-realistic photogrammetry-grade textures, cinematic lighting, Ray-traced reflections, Unreal Engine 5 render style, professional architectural photography, award-winning archviz"
         
-        # پرامپت منفی مجزا
         negative_prompt = "cartoon, drawing, 3d render style, low quality, plastic textures, blurry, distorted window frames, messy geometry, extra buildings, text, logo, watermark, warped lines, flat lighting"
 
-        # بازگرداندن قالب استاندارد دیکشنری
         return {
             "prompt": positive_prompt,
             "negative_prompt": negative_prompt
