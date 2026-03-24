@@ -16,8 +16,8 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 def _build_endpoint() -> str:
-    # برای معماری، این آدرس باید به control/structure ختم شود
-    model_path = STABILITY_API_MODEL.strip().lstrip("/")
+    # 👈 مشکل دقیقاً اینجا بود که اصلاح شد (IMAGE به جای API)
+    model_path = STABILITY_IMAGE_MODEL.strip().lstrip("/")
     return f"{STABILITY_API_HOST}/v2beta/{model_path}"
 
 
@@ -47,12 +47,10 @@ def generate_design(input_image_path: str, mask_path: Optional[str], prompt_data
         "Accept": "image/*",
     }
 
-    # --- 🛠 تغییر حیاتی: بازگشت به وفاداری ساختاری ---
-    # عدد جادویی برای معماری: 0.65 (۶۵٪ وفاداری به خطوط، ۳۵٪ تغییر متریال)
-    # این عدد تضمین می‌کند جای کابینت‌ها تکان نخورد.
+    # عدد جادویی برای حفظ هندسه آشپزخانه: 0.65
     optimal_strength = 0.65
 
-    # تولید عدد رندوم واقعی اگر در کانفیگ 0 باشد
+    # تولید عدد رندوم واقعی
     current_seed = _normalize_seed(STABILITY_SEED)
     if current_seed == 0:
         current_seed = random.randint(1000000, 9999999)
@@ -62,10 +60,9 @@ def generate_design(input_image_path: str, mask_path: Optional[str], prompt_data
         "negative_prompt": negative_prompt,
         "output_format": output_format,
         "seed": str(current_seed),
-        # ارسال هر دو پارامتر برای تضمین عملکرد
         "strength": str(optimal_strength), 
         "control_strength": str(optimal_strength),
-        "cfg_scale": "9.0"  # 👈 بالا بردن برای توجه بیشتر هوش مصنوعی به پرامپت (شب شدن و سبز شدن)
+        "cfg_scale": "9.0"
     }
 
     files = {
