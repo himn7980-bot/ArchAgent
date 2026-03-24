@@ -124,7 +124,7 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
         # ۱. ترجمه درخواست کاربر
         english_request = translate_request_to_english(user_text)
         
-        # 🔍 پیام دیباگ اول: بررسی خروجی مترجم
+        # 🔍 پیام دیباگ اول
         await update.message.reply_text(f"🔍 [DEBUG] Translated:\n{english_request}")
 
         # ۲. ساخت پرامپت نهایی
@@ -136,7 +136,7 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
             user_text=english_request,
         )
 
-        # 🔍 پیام دیباگ دوم: بررسی متنی که به سرور رندر می‌رود
+        # 🔍 پیام دیباگ دوم
         debug_text = prompt_data['prompt'][:150] if isinstance(prompt_data, dict) else str(prompt_data)[:150]
         await update.message.reply_text(f"🔍 [DEBUG] Final Prompt:\n{debug_text}...")
 
@@ -199,7 +199,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def process_image_sync(temp_path: str, image_path: str):
-    """تابع همگام برای ریسایز کردن تصویر بدون مسدود کردن ربات"""
     with Image.open(temp_path) as img:
         img = img.convert("RGBA")
         scale = min(1024 / img.size[0], 1024 / img.size[1])
@@ -224,7 +223,6 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await tg_file.download_to_drive(temp)
 
-    # پردازش غیرمسدودکننده تصویر
     await asyncio.to_thread(process_image_sync, temp, image_path)
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
@@ -342,7 +340,6 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 app_web = FastAPI()
 
-# نقطه‌ی ایده‌آل برای UptimeRobot
 @app_web.get("/")
 @app_web.get("/ping")
 def health():
@@ -352,13 +349,12 @@ def health():
 def webapp():
     return HTMLResponse("<h2>💎 TON Panel</h2><p>Connect your wallet to Mint NFTs or Pay for Pro features.</p>")
 
-
 def run_web():
     uvicorn.run(
         app_web,
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 10000)),
-        log_level="warning" # کاهش لاگ‌های اضافی سرور وب
+        log_level="warning"
     )
 
 
@@ -375,11 +371,8 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
     app.add_handler(CallbackQueryHandler(handle_callbacks))
 
-    # اجرای وب‌سرور برای پاسخ به UptimeRobot و مینی‌اپ در پس‌زمینه
     threading.Thread(target=run_web, daemon=True).start()
-
     print("🚀 ArchAgent is running and ready for UptimeRobot!")
-
     app.run_polling()
 
 
