@@ -32,10 +32,7 @@ from storage import create_project
 from prompt_engine import PromptEngine
 import database
 
-# ساخت یا بارگذاری دیتابیس در همان ابتدای اجرا
 database.init_db()
-
-# راه‌اندازی کلاینت OpenAI (یادت نره OPENAI_API_KEY رو در Render ست کنی)
 openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # =========================
@@ -52,8 +49,7 @@ def detect_message_lang(text: str) -> str:
 def get_user_lang(update: Update):
     user_id = update.effective_user.id
     db_user = database.get_user(user_id)
-    if db_user:
-        return db_user["lang"]
+    if db_user: return db_user["lang"]
     lang = (update.effective_user.language_code or "en").lower()
     if lang.startswith("fa"): return "fa"
     if lang.startswith("ar"): return "ar"
@@ -69,9 +65,9 @@ def reset_user_flow(context):
     context.user_data.clear()
     if lang: context.user_data["lang"] = lang
 
-# =========================
-# Keyboards
-# =========================
+def get_upsell_keyboard(update, context):
+    btn_text = t(update, context, "premium_btn")
+    return InlineKeyboardMarkup([[InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={update.effective_user.id}"))]])
 
 def style_keyboard():
     return InlineKeyboardMarkup([
@@ -96,49 +92,34 @@ def weather_keyboard():
 def result_keyboard(update, context, project_id):
     btn_text = t(update, context, "ton_panel_btn")
     return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("🔁 Regenerate", callback_data="redo"),
-            InlineKeyboardButton("🎨 Change Style", callback_data="change_style"),
-        ],
-        [
-            InlineKeyboardButton(
-                btn_text,
-                web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={update.effective_user.id}")
-            ),
-            InlineKeyboardButton("🖼 Mint NFT", callback_data="mint_hint"),
-        ],
+        [InlineKeyboardButton("🔁 Regenerate", callback_data="redo"), InlineKeyboardButton("🎨 Change Style", callback_data="change_style")],
+        [InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={update.effective_user.id}")), InlineKeyboardButton("🖼 Mint NFT", callback_data="mint_hint")],
     ])
 
 # =========================
-# Core AI Process
+# Core AI Process (Image)
 # =========================
 
 async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, user_text: str):
     user_id = update.effective_user.id
     db_user = database.get_user(user_id)
     
-    # بررسی موجودی کاربر از دیتابیس
-    if not db_user or db_user["credits"] <= 0:
-        upsell_text = t(update, context, "upsell")
-        btn_text = t(update, context, "premium_btn")
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))
-        ]])
-        return await update.message.reply_text(upsell_text, reply_markup=keyboard, parse_mode="Markdown")
+    # برای ساخت عکس 10 کریدیت لازم است
+    if not db_user or db_user["credits"] < 10:
+        return await update.message.reply_text(t(update, context, "upsell"), reply_markup=get_upsell_keyboard(update, context), parse_mode="Markdown")
 
     data = context.user_data
     if not data.get("photo_path") or not os.path.exists(data["photo_path"]):
         return await update.message.reply_text("⚠️ Please send a photo first.")
 
-    # کسر یک کریدیت
-    database.deduct_credit(user_id)
+    # کسر 10 کریدیت
+    database.deduct_credit(user_id, amount=10)
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     await update.message.reply_text(t(update, context, "generating"))
 
     try:
         english_request = translate_request_to_english(user_text)
-
         prompt_data = PromptEngine.build_final_prompt(
             space_type=data.get("space_type", "interior"),
             style=data.get("style", "modern"),
@@ -150,10 +131,7 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
         generated = generate_design(data["photo_path"], None, prompt_data)
 
-        project_id = create_project(
-            str(user_id),
-            {"generated_image": generated, "prompt": str(prompt_data)}
-        )
+        project_id = create_project(str(user_id), {"generated_image": generated, "prompt": str(prompt_data)})
 
         if generated.startswith("http"):
             await update.message.reply_photo(generated)
@@ -161,33 +139,21 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
             with open(generated, "rb") as img:
                 await update.message.reply_photo(img)
 
-        # اگر کاربر پریمیوم است
         if db_user["is_premium"]:
             stores = get_store_suggestions(data["space_type"], data["style"])
             if stores: await update.message.reply_text(f"🛒 **Stores & Materials:**\n" + "\n".join(stores), parse_mode="Markdown")
-            
             cost = estimate_cost(data["space_type"], data["style"])
             if cost: await update.message.reply_text(f"📊 **Cost Estimation:**\n{str(cost)}", parse_mode="Markdown")
         else:
             materials = suggest_materials(data["space_type"], data["style"])
             if materials: await update.message.reply_text("\n".join(materials))
 
-        context.user_data.update({
-            "awaiting_description": False,
-            "last_project_id": project_id,
-            "last_generated_image": generated,
-            "last_request_text": user_text
-        })
-
-        await update.message.reply_text(
-            t(update, context, "wallet_prompt"),
-            reply_markup=result_keyboard(update, context, project_id),
-        )
+        context.user_data.update({"awaiting_description": False, "last_project_id": project_id, "last_generated_image": generated, "last_request_text": user_text})
+        await update.message.reply_text(t(update, context, "wallet_prompt"), reply_markup=result_keyboard(update, context, project_id))
 
     except Exception as e:
         print(f"Error: {e}")
-        # در صورت بروز خطا، کریدیت را به کاربر برمی‌گردانیم
-        database.add_credits(user_id, 1)
+        database.add_credits(user_id, 10) # بازگرداندن کریدیت
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
 # =========================
@@ -197,39 +163,21 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     lang = get_user_lang(update)
-    
-    # ساخت پروفایل در دیتابیس (با ۳ رندر هدیه)
     database.create_user_if_not_exists(user_id, lang)
-    
     reset_user_flow(context)
-    btn_text = t(update, context, "ton_panel_btn")
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))]
-    ])
-    await update.message.reply_text(t(update, context, "welcome"), reply_markup=keyboard, parse_mode="Markdown")
+    await update.message.reply_text(t(update, context, "welcome"), reply_markup=get_upsell_keyboard(update, context), parse_mode="Markdown")
 
 async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     db_user = database.get_user(user_id)
-    
-    if not db_user:
-        return await update.message.reply_text("User not found. Please send /start.")
+    if not db_user: return await update.message.reply_text("User not found.")
 
-    is_premium = db_user["is_premium"]
-    credits = db_user["credits"]
-    
-    user_name = update.effective_user.first_name
+    is_premium, credits = db_user["is_premium"], db_user["credits"]
     icon = "💎" if is_premium else ""
     status = "Premium Member" if is_premium else "Free User"
     
-    text = t(update, context, "profile").format(
-        name=user_name, icon=icon, status=status, credits=credits
-    )
-    
-    btn_text = t(update, context, "ton_panel_btn")
-    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))]])
-    await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
+    text = t(update, context, "profile").format(name=update.effective_user.first_name, icon=icon, status=status, credits=credits)
+    await update.message.reply_text(text, reply_markup=get_upsell_keyboard(update, context), parse_mode="Markdown")
 
 async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -237,22 +185,11 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
         data = json.loads(update.message.web_app_data.data)
         if data.get("action") == "payment_success":
             pkg = data.get("package")
-            added_credits = 0
+            added_credits = {"starter": 150, "pro": 400, "master": 1000}.get(pkg, 0)
             
-            if pkg == "starter": added_credits = 15
-            elif pkg == "pro": added_credits = 35
-            elif pkg == "master": added_credits = 80
-                
-            # افزایش کریدیت در دیتابیس
             database.add_credits(user_id, added_credits)
-            
-            # خواندن موجودی جدید برای ارسال پیام تبریک
-            db_user = database.get_user(user_id)
-            current_credits = db_user["credits"]
-            
-            msg = t(update, context, "payment_success").format(
-                amount=added_credits, credits=current_credits
-            )
+            current_credits = database.get_user(user_id)["credits"]
+            msg = t(update, context, "payment_success").format(amount=added_credits, credits=current_credits)
             await update.message.reply_text(msg, parse_mode="Markdown")
     except Exception as e:
         print(f"Web App Data Error: {e}")
@@ -286,12 +223,8 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: scene = "interior"
 
     context.user_data.update({
-        "photo_path": image_path,
-        "space_type": scene,
-        "style": None, "time_of_day": None, "weather": None,
-        "awaiting_description": False,
+        "photo_path": image_path, "space_type": scene, "style": None, "time_of_day": None, "weather": None, "awaiting_description": False,
     })
-
     await update.message.reply_text(f"Scene detected: {scene}\nChoose style:", reply_markup=style_keyboard())
 
 async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -306,21 +239,20 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text("⚠️ لطفا ابتدا یک عکس از فضا ارسال کنید.")
         await process_request(update, context, text)
     else:
-        # دستیار هوشمند فقط برای کاربران پریمیوم
         db_user = database.get_user(user_id)
-        if not db_user or not db_user["is_premium"]:
-            upsell_text = t(update, context, "upsell")
-            btn_text = t(update, context, "premium_btn")
-            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))]])
-            return await update.message.reply_text("🌟 چت با هوش مصنوعی مختص کاربران Premium است.\n\n" + upsell_text, reply_markup=keyboard, parse_mode="Markdown")
+        # برای شروع چت حداقل ۱ کریدیت نیاز است
+        if not db_user or db_user["credits"] < 1:
+            return await update.message.reply_text(t(update, context, "upsell"), reply_markup=get_upsell_keyboard(update, context), parse_mode="Markdown")
 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+        
         system_prompt = (
-            "You are ArchAgent, an expert AI architect and interior designer. "
-            "You provide professional advice on building materials, interior design concepts, "
-            "color palettes, and space planning. Be helpful, concise, and professional. "
-            "Respond in the same language the user speaks. Do not offer image editing in this prompt."
+            "You are ArchAgent, an expert AI architect. "
+            "If the user asks for advice, reply normally in their language. "
+            "HOWEVER, if the user explicitly asks you to 'design', 'create', 'draw', or 'generate' an image/scene from scratch, "
+            "ONLY reply with EXACTLY this format: [GENERATE] <highly detailed architectural prompt in English>"
         )
+        
         try:
             response = await openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -329,7 +261,32 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     {"role": "user", "content": text}
                 ]
             )
-            await update.message.reply_text(response.choices[0].message.content)
+            ai_reply = response.choices[0].message.content.strip()
+
+            if ai_reply.startswith("[GENERATE]"):
+                # برای تولید عکس از صفر 10 کریدیت چک می‌شود
+                if db_user["credits"] < 10:
+                    return await update.message.reply_text(t(update, context, "upsell"), reply_markup=get_upsell_keyboard(update, context), parse_mode="Markdown")
+                
+                image_prompt = ai_reply.replace("[GENERATE]", "").strip()
+                database.deduct_credit(user_id, amount=10)
+                
+                await update.message.reply_text("✨ دستیار در حال خلق ایده ذهنی شماست...")
+                await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
+                
+                final_prompt = {"prompt": f"{image_prompt}, architectural photography, 8k resolution, photorealistic", "negative_prompt": "cartoon, illustration, low quality, distorted"}
+                generated = generate_design(None, None, final_prompt)
+                
+                if generated.startswith("http"):
+                    await update.message.reply_photo(generated, caption="🎨 طرح پیشنهادی دستیار")
+                else:
+                    with open(generated, "rb") as img:
+                        await update.message.reply_photo(img, caption="🎨 طرح پیشنهادی دستیار")
+            else:
+                # پیام متنی عادی، فقط ۱ کریدیت کسر می‌شود
+                database.deduct_credit(user_id, amount=1)
+                await update.message.reply_text(ai_reply)
+
         except Exception as e:
             print(f"OpenAI Error: {e}")
             await update.message.reply_text("❌ خطا در ارتباط با دستیار هوشمند.")
@@ -337,27 +294,20 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("photo_path") or not os.path.exists(context.user_data["photo_path"]):
         return await update.message.reply_text("⚠️ Please send a photo first.")
-
     path = os.path.join(UPLOAD_DIR, f"voice_{update.effective_user.id}.ogg")
-    
     try:
         file = await context.bot.get_file(update.message.voice.file_id)
         await file.download_to_drive(path)
-
         transcription = transcribe_voice(path)
         text = transcription.get("text", "")
-        
-        if not text:
-            return await update.message.reply_text("Could not understand the voice.")
-            
+        if not text: return await update.message.reply_text("Could not understand the voice.")
         await update.message.reply_text(f"🎤 You said: {text}")
         context.user_data["awaiting_description"] = True
         await process_request(update, context, text)
     except Exception as e:
-        await update.message.reply_text("Error processing voice message.")
+        pass
     finally:
-        if os.path.exists(path):
-            os.remove(path)
+        if os.path.exists(path): os.remove(path)
 
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -426,14 +376,14 @@ def webapp():
     </head>
     <body>
         <div class="container">
-            <h2>💎 Recharge Renders</h2>
-            <p class="header-text">Connect wallet and buy credits. 1 Credit = 1 AI 8K Render + AI Chat.</p>
+            <h2>💎 Buy Credits</h2>
+            <p class="header-text">1 Image = 10 Credits | 1 Chat = 1 Credit</p>
             <div id="ton-connect"></div>
             
             <div class="package-card">
                 <div class="package-info">
                     <div class="package-title">Starter Pack</div>
-                    <div class="package-desc">15 Renders</div>
+                    <div class="package-desc">150 Credits</div>
                 </div>
                 <button class="buy-btn" onclick="buyPackage('starter', '0.5')">0.5 TON</button>
             </div>
@@ -441,7 +391,7 @@ def webapp():
             <div class="package-card" style="border-color: #0098EA;">
                 <div class="package-info">
                     <div class="package-title">Pro Pack 🔥</div>
-                    <div class="package-desc">35 Renders (Best Value)</div>
+                    <div class="package-desc">400 Credits (Best Value)</div>
                 </div>
                 <button class="buy-btn" onclick="buyPackage('pro', '1.0')">1 TON</button>
             </div>
@@ -449,7 +399,7 @@ def webapp():
             <div class="package-card">
                 <div class="package-info">
                     <div class="package-title">Master Pack</div>
-                    <div class="package-desc">80 Renders</div>
+                    <div class="package-desc">1000 Credits</div>
                 </div>
                 <button class="buy-btn" onclick="buyPackage('master', '2.0')">2 TON</button>
             </div>
@@ -517,12 +467,11 @@ def run_bot():
     
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
 
-    print("🚀 ArchAgent bot is polling with SQLite DB...")
+    print("🚀 ArchAgent bot is polling with Unified Coin System...")
     app.run_polling(stop_signals=None)
 
 def main():
     threading.Thread(target=run_bot, daemon=True).start()
-    
     port = int(os.environ.get("PORT", 10000))
     print(f"🌐 Starting Web Server on port {port} for Render/UptimeRobot...")
     uvicorn.run(app_web, host="0.0.0.0", port=port, log_level="warning")
