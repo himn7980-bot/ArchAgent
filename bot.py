@@ -121,9 +121,13 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
     await update.message.reply_text(t(update, context, "generating"))
 
     try:
+        # ۱. ترجمه درخواست کاربر
         english_request = translate_request_to_english(user_text)
+        
+        # 🔍 پیام دیباگ اول: بررسی خروجی مترجم
+        await update.message.reply_text(f"🔍 [DEBUG] Translated:\n{english_request}")
 
-        # ساخت پرامپت (حالا یک دیکشنری شامل positive و negative برمی‌گرداند)
+        # ۲. ساخت پرامپت نهایی
         prompt_data = PromptEngine.build_final_prompt(
             space_type=data.get("space_type", "interior"),
             style=data.get("style", "modern"),
@@ -132,9 +136,13 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
             user_text=english_request,
         )
 
+        # 🔍 پیام دیباگ دوم: بررسی متنی که به سرور رندر می‌رود
+        debug_text = prompt_data['prompt'][:150] if isinstance(prompt_data, dict) else str(prompt_data)[:150]
+        await update.message.reply_text(f"🔍 [DEBUG] Final Prompt:\n{debug_text}...")
+
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
 
-        # تولید تصویر (سازگار شده با پرامپت دیکشنری و تغییرات strength در فایل design.py)
+        # ۳. ارسال به موتور استبیلیتی
         generated = generate_design(data["photo_path"], None, prompt_data)
 
         # ذخیره پروژه
@@ -142,7 +150,7 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
             str(update.effective_user.id),
             {
                 "generated_image": generated,
-                "prompt": str(prompt_data) # تبدیل به استرینگ برای ذخیره امن در دیتابیس
+                "prompt": str(prompt_data)
             }
         )
 
