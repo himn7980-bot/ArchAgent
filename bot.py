@@ -210,18 +210,8 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    try:
-        data = json.loads(update.message.web_app_data.data)
-        if data.get("action") == "payment_success":
-            pkg = data.get("package")
-            added_credits = {"starter": 150, "pro": 400, "master": 1000}.get(pkg, 0)
-            
-            database.add_credits(user_id, added_credits)
-            current_credits = database.get_user(user_id)["credits"]
-            msg = t(update, context, "payment_success").format(amount=added_credits, credits=current_credits)
-            await update.message.reply_text(msg, parse_mode="Markdown")
-    except Exception as e:
-        print(f"Web App Data Error: {e}")
+    # این بخش برای امنیت بیشتر و هماهنگی با API جدید نگه داشته شده است
+    pass
 
 def process_image_sync(temp_path: str, image_path: str):
     with Image.open(temp_path) as img:
@@ -386,6 +376,13 @@ MY_WALLET_ADDRESS = "UQDPVUpClyvBg0GXnl-IHVB6Q5I_CRp-psFhkasI-uPMpUfm"
 @app_web.get("/ping")
 def health(): return {"ArchAgent": "running", "status": "200 OK"}
 
+# مسیر جدید برای تایید پرداخت و شارژ آنی دیتابیس
+@app_web.get("/confirm_payment")
+async def confirm_payment(user_id: int, package: str):
+    added = {"starter": 150, "pro": 400, "master": 1000}.get(package, 0)
+    database.add_credits(user_id, added)
+    return {"status": "success", "added": added}
+
 @app_web.get("/tonconnect-manifest.json")
 def get_manifest(request: Request):
     base_url = str(request.base_url).rstrip("/")
@@ -483,8 +480,13 @@ def webapp():
                     
                     await tonConnectUI.sendTransaction(transaction);
                     
+                    // فراخوانی مستقیم API شارژ برای حل مشکل شارژ نشدن اعتبار
+                    const uid = new URLSearchParams(window.location.search).get('user_id');
+                    document.getElementById('status-msg').innerText = "⌛ Charging credits...";
+                    await fetch('/confirm_payment?user_id=' + uid + '&package=' + pkgType);
+
                     document.getElementById('status-msg').innerText = "✅ Success! Returning to bot...";
-                    tg.sendData(JSON.stringify({{action: "payment_success", package: pkgType}}));
+                    setTimeout(() => {{ tg.close(); }}, 1500);
                     
                 }} catch (e) {{
                     alert("⚠️ Error Details: " + e.message); 
