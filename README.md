@@ -53,9 +53,10 @@ ArchAgent introduces a **TON-powered credit economy**, solving the challenge of 
 
 ## 🎬 Submission Info
 
-* **Bot Link:** [t.me/ArchAgent_hadi_bot](https://t.me/ArchAgent_hadi_bot)
-* **Demo Video:** [لینک یوتیوب یا درایو ویدیو را اینجا بگذار]
+* **Telegram Bot:** [https://t.me/ArchAgent_hadi_bot](https://t.me/ArchAgent_hadi_bot)
+* **Official Channel:** [https://t.me/archagent2026](https://t.me/archagent2026) 📢
+* **Demo Video:** [https://youtu.be/SeSJvqf4iKQ](https://youtu.be/SeSJvqf4iKQ) 🎬
 * **Category:** User-Facing AI Agent
 
 ---
-*ArchAgent — Bringing decentralized architectural intelligence to The Open Network.*
+**ArchAgent — Turning Telegram into the first decentralized AI architect on TON.**
