@@ -29,7 +29,6 @@ class PromptEngine:
         env_pos = []
         env_neg = []
 
-        # --- Time of Day Handling ---
         if time_of_day == "day":
             if is_interior:
                 env_pos.append("(bright diffused daylight through windows:1.4), (natural bounce lighting:1.3), well-lit interior")
@@ -45,7 +44,6 @@ class PromptEngine:
             env_pos.append("(golden hour lighting:1.5), (vivid sunset sky:1.4), 3000K warm glow, (long dramatic orange-tinted shadows:1.3), twilight architecture")
             env_neg.append("(midday sun:1.4), flat lighting, clear blue sky, white light")
 
-        # --- Weather Handling ---
         if weather == "rain":
             env_pos.append("(heavy rain:1.5), (wet reflective surfaces:1.5), (PBR puddle reflections:1.4), moody overcast sky, volumetric fog, damp architectural materials")
             env_neg.append("(dry surfaces:1.5), sunny, bright blue sky, arid")
@@ -69,10 +67,8 @@ class PromptEngine:
         space_text = cls.get_space_details(space_type)
         env_data = cls.get_environment_details(time_of_day, weather, space_type)
 
-        # وزن دادن به درخواست کاربر بدون اضافه کردن کلمات اضافی مثل strongly colored که برای متن‌هایی مثل شهر کربلا خرابکاری می‌کرد
         user_focus = f"({user_text}:1.5), " if user_text else ""
 
-        # ساختاربندی اصولی پرامپت: اولویت با درخواست کاربر + زمان/آب‌وهوا + نوع فضا + استایل + کلمات کلیدی کیفیت
         positive_prompt = (
             f"{user_focus}"
             f"{env_data['positive']}, "
@@ -81,7 +77,6 @@ class PromptEngine:
             f"Hyper-realistic photogrammetry-grade textures, cinematic lighting, 8k resolution, Unreal Engine 5 render, architectural masterpiece"
         )
         
-        # ترکیب پرامپت منفی پایه برای معماری با پرامپت‌های منفی مربوط به زمان و آب‌وهوا
         base_negative = "cartoon, illustration, drawing, 3d render style, low quality, plastic textures, blurry, flat lighting, distorted perspective, bad geometry, mutated structure, watermark, text"
         
         final_negative = base_negative
