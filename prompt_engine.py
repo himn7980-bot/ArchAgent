@@ -17,7 +17,7 @@ class PromptEngine:
             "bathroom": "luxury spa-like bathroom, walk-in rain shower, premium stone tiling, freestanding tub, floating vanity, indirect ambient lighting",
             "living_room": "sophisticated living area, architectural feature wall, designer furniture composition, premium flooring, open-concept luxury living",
             "interior": "professional interior architectural visualization, curated decor, premium material palette, realistic depth and spatial awareness",
-            "unfinished": "fully finished luxury architectural masterpiece, premium cladding, brand new windows, beautiful landscaping, pristine condition", # اصلاح شده به توصیف نتیجه نهایی
+            "unfinished": "fully finished luxury architectural masterpiece, premium cladding, brand new windows, beautiful landscaping, pristine condition",
             "exterior": "architectural facade redesign, premium exterior cladding, modern window systems, balcony integration, professional landscape context"
         }
         return spaces.get(space_type, "architectural visualization")
@@ -44,19 +44,21 @@ class PromptEngine:
         return ", ".join(env_parts) if env_parts else "balanced global illumination"
 
     @classmethod
-   @classmethod
     def build_final_prompt(cls, space_type: str, style: str, time_of_day: str, weather: str, user_text: str) -> dict:
         style_text = cls.get_style_details(style)
         space_text = cls.get_space_details(space_type)
         env_text = cls.get_environment_details(time_of_day, weather, space_type)
 
-        # حذف سینتکس پرانتز که موتور استبیلیتی رو گیج میکنه
+        # 👈 تغییر حیاتی: حذف پرانتزها و جایگزینی با دستور متنی صریح برای جلوگیری از کرش موتور
         user_focus = f"CRITICAL REQUIREMENT: {user_text}, " if user_text else ""
 
-        positive_prompt = f"{user_focus}{space_text}, {style_text}, {env_text}, Hyper-realistic photogrammetry-grade textures, cinematic lighting, Ray-traced reflections, Unreal Engine 5 render style"
+        # ساخت پرامپت مثبت یکپارچه
+        positive_prompt = f"{user_focus}{space_text}, {style_text}, {env_text}, Hyper-realistic photogrammetry-grade textures, cinematic lighting, Ray-traced reflections, Unreal Engine 5 render style, professional architectural photography, award-winning archviz"
         
+        # پرامپت منفی مجزا
         negative_prompt = "cartoon, drawing, 3d render style, low quality, plastic textures, blurry, distorted window frames, messy geometry, extra buildings, text, logo, watermark, warped lines, flat lighting"
 
+        # بازگرداندن قالب استاندارد دیکشنری
         return {
             "prompt": positive_prompt,
             "negative_prompt": negative_prompt
