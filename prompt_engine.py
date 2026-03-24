@@ -44,21 +44,19 @@ class PromptEngine:
         return ", ".join(env_parts) if env_parts else "balanced global illumination"
 
     @classmethod
+   @classmethod
     def build_final_prompt(cls, space_type: str, style: str, time_of_day: str, weather: str, user_text: str) -> dict:
         style_text = cls.get_style_details(style)
         space_text = cls.get_space_details(space_type)
         env_text = cls.get_environment_details(time_of_day, weather, space_type)
 
-        # اعمال وزن بالا به درخواست کاربر (سینتکس استاندارد Stable Diffusion)
-        user_focus = f"({user_text}:1.5), " if user_text else ""
+        # حذف سینتکس پرانتز که موتور استبیلیتی رو گیج میکنه
+        user_focus = f"CRITICAL REQUIREMENT: {user_text}, " if user_text else ""
 
-        # ساخت پرامپت مثبت به صورت کلمات کلیدی (Comma-separated)
-        positive_prompt = f"{user_focus}{space_text}, {style_text}, {env_text}, Hyper-realistic photogrammetry-grade textures, cinematic lighting, Ray-traced reflections, Unreal Engine 5 render style, professional architectural photography, award-winning archviz"
+        positive_prompt = f"{user_focus}{space_text}, {style_text}, {env_text}, Hyper-realistic photogrammetry-grade textures, cinematic lighting, Ray-traced reflections, Unreal Engine 5 render style"
         
-        # پرامپت منفی مجزا
         negative_prompt = "cartoon, drawing, 3d render style, low quality, plastic textures, blurry, distorted window frames, messy geometry, extra buildings, text, logo, watermark, warped lines, flat lighting"
 
-        # بازگرداندن دیکشنری تا هر دو پرامپت قابل استفاده باشند
         return {
             "prompt": positive_prompt,
             "negative_prompt": negative_prompt
