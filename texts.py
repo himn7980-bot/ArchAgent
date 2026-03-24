@@ -2,32 +2,30 @@ TEXTS = {
     "en": {
         "welcome": (
             "🏛 **Welcome to ArchAgent!**\n\n"
-            "I am your AI Architectural Assistant. You can use me in two ways:\n\n"
-            "📸 **1. Redesign Spaces:** Send me a photo of any room or building. (🎁 3 Free Credits!)\n\n"
-            "💬 **2. Architecture Chat:** Just type your questions! Ask me about materials, or design advice."
+            "I am your AI Architectural Assistant. You can use me for:\n\n"
+            "📸 **1. Image Design (10 Credits):** Send a photo or ask me to design from scratch.\n"
+            "💬 **2. AI Chat (1 Credit):** Ask for architecture and design advice.\n\n"
+            "🎁 You have **30 Free Credits** to start!"
         ),
         "generating": "⏳ Analyzing architecture and generating your design...",
-        "wallet_prompt": "✅ Generation complete! You can regenerate, change style, or use the TON Panel to mint this as an NFT or buy more credits.",
+        "wallet_prompt": "✅ Generation complete! You can regenerate, change style, or open the Store.",
         "upsell": (
-            "🌟 **Your render credits are empty!**\n\n"
-            "To continue using ArchAgent, please buy a credit pack using TON.\n\n"
-            "💎 **Premium Benefits:**\n"
-            "🖼 **8K Quality:** Ultra-realistic cinematic outputs\n"
-            "🤖 **Unlimited AI Assistant:** Architecture chat & consultation\n"
-            "🛒 **Store Suggestions:** Best stores with top quality\n\n"
-            "👇 Click the button below to top-up:"
+            "🌟 **Insufficient Credits!**\n\n"
+            "You need more credits to perform this action. Top up your account using TON to continue.\n\n"
+            "👇 Click the button below to open the store:"
         ),
         "profile": (
             "👤 **User Profile: {name} {icon}**\n"
             "--------------------------\n"
             "👑 Status: `{status}`\n"
-            "💳 Render Credits: `{credits}`\n"
+            "🪙 Balance: `{credits} Credits`\n"
+            "ℹ️ *(1 Image = 10 Credits | 1 Chat = 1 Credit)*\n"
             "--------------------------\n"
         ),
         "payment_success": (
             "🎉 **Payment Successful!**\n\n"
-            "**{amount} Renders** have been added to your account.\n"
-            "💳 Current Balance: {credits} Credits\n\n"
+            "**{amount} Credits** have been added to your account.\n"
+            "🪙 Current Balance: {credits} Credits\n\n"
             "You are now a Premium member 💎"
         ),
         "premium_btn": "💎 Buy Credits (TON)",
@@ -37,32 +35,30 @@ TEXTS = {
     "fa": {
         "welcome": (
             "🏛 **به ArchAgent خوش آمدید!**\n\n"
-            "من دستیار هوشمند معماری شما هستم. دو قابلیت اصلی:\n\n"
-            "📸 **۱. طراحی مجدد:** یک عکس از فضا بفرستید تا آن را طراحی کنم. (🎁 ۳ رندر رایگان!)\n\n"
-            "💬 **۲. چت هوشمند:** هر سوالی درباره معماری و دکوراسیون دارید تایپ کنید."
+            "من دستیار هوشمند معماری شما هستم:\n\n"
+            "📸 **۱. طراحی عکس (۱۰ کریدیت):** یک عکس بفرستید یا بخواهید از صفر طراحی کنم.\n"
+            "💬 **۲. چت هوشمند (۱ کریدیت):** مشاوره معماری بگیرید.\n\n"
+            "🎁 شما **۳۰ کریدیت رایگان** برای شروع دارید!"
         ),
         "generating": "⏳ در حال تحلیل معماری و تولید رندر اختصاصی...",
-        "wallet_prompt": "✅ رندر آماده شد! می‌توانید دوباره رندر بگیرید یا برای شارژ حساب وارد فروشگاه TON شوید.",
+        "wallet_prompt": "✅ رندر آماده شد! می‌توانید دوباره رندر بگیرید یا برای شارژ حساب وارد فروشگاه شوید.",
         "upsell": (
-            "🌟 **موجودی رندرهای شما به پایان رسیده است!**\n\n"
-            "برای ادامه کار، لطفاً یکی از بسته‌های شارژ را خریداری کنید.\n\n"
-            "💎 **با خرید بسته Premium می‌شوید:**\n"
-            "🖼 کیفیت خروجی 8K\n"
-            "🤖 چت نامحدود با دستیار هوشمند معماری\n"
-            "🛒 پیشنهاد متریال و برآورد هزینه\n\n"
+            "🌟 **موجودی کافی نیست!**\n\n"
+            "برای این عملیات کریدیت کافی ندارید. لطفاً از طریق پنل TON حساب خود را شارژ کنید.\n\n"
             "👇 برای شارژ حساب کلیک کنید:"
         ),
         "profile": (
             "👤 **پروفایل کاربری: {name} {icon}**\n"
             "--------------------------\n"
-            "👑 وضعیت اکانت: `{status}`\n"
-            "💳 موجودی رندر: `{credits}` رندر\n"
+            "👑 وضعیت: `{status}`\n"
+            "🪙 موجودی: `{credits} کریدیت`\n"
+            "ℹ️ *(هر عکس = ۱۰ کریدیت | هر پیام چت = ۱ کریدیت)*\n"
             "--------------------------\n"
         ),
         "payment_success": (
             "🎉 **پرداخت موفقیت‌آمیز بود!**\n\n"
-            "تعداد **{amount} رندر** به حساب شما اضافه شد.\n"
-            "💳 موجودی فعلی شما: {credits} رندر\n\n"
+            "تعداد **{amount} کریدیت** به حساب شما اضافه شد.\n"
+            "🪙 موجودی فعلی شما: {credits} کریدیت\n\n"
             "حساب شما به Premium ارتقا یافت 💎"
         ),
         "premium_btn": "💎 شارژ حساب (TON)",
@@ -72,60 +68,46 @@ TEXTS = {
     "ar": {
         "welcome": (
             "🏛 **مرحباً بك في ArchAgent!**\n\n"
-            "📸 **1. إعادة تصميم:** أرسل صورة لأي غرفة. (🎁 3 رصيد مجاني!)\n\n"
-            "💬 **2. استشارة:** اسألني عن التصميم الداخلي."
+            "📸 **1. تصميم (10 رصيد):** أرسل صورة أو اطلب تصميماً.\n"
+            "💬 **2. محادثة ذكية (1 رصيد):** استشارة معمارية.\n\n"
+            "🎁 لديك **30 رصيد مجاني**!"
         ),
         "generating": "⏳ جاري توليد تصميمك...",
-        "wallet_prompt": "✅ اكتمل التصميم! يمكنك استخدام لوحة TON لشراء المزيد من الرصيد.",
-        "upsell": (
-            "🌟 **نفد رصيد التصاميم الخاص بك!**\n\n"
-            "للاستمرار، قم بشراء باقة رصيد عبر TON.\n\n"
-            "💎 **ميزات Premium:**\n"
-            "🖼 جودة 8K\n🤖 مساعد ذكي غير محدود\n🛒 اقتراح المتاجر\n\n👇 اضغط للشحن:"
-        ),
+        "wallet_prompt": "✅ اكتمل التصميم! يمكنك استخدام المتجر لشراء رصيد.",
+        "upsell": "🌟 **رصيد غير كافٍ!**\n\nيرجى شحن حسابك عبر TON للمتابعة.\n\n👇 اضغط للشحن:",
         "profile": (
             "👤 **الملف الشخصي: {name} {icon}**\n"
             "--------------------------\n"
             "👑 الحالة: `{status}`\n"
-            "💳 رصيد التصاميم: `{credits}`\n"
+            "🪙 الرصيد: `{credits}`\n"
+            "ℹ️ *(صورة = 10 رصيد | رسالة = 1 رصيد)*\n"
             "--------------------------\n"
         ),
-        "payment_success": (
-            "🎉 **تم الدفع بنجاح!**\n\n"
-            "تمت إضافة **{amount} تصميم** إلى حسابك.\n"
-            "💳 الرصيد الحالي: {credits}\n\nأنت الآن عضو Premium 💎"
-        ),
+        "payment_success": "🎉 **تم الدفع!**\n\nأضيف **{amount} رصيد**.\n🪙 الرصيد الحالي: {credits}\nأنت Premium 💎",
         "premium_btn": "💎 شراء رصيد (TON)",
-        "ton_panel_btn": "💎 فتح المتجر"
+        "ton_panel_btn": "💎 المتجر"
     },
 
     "ru": {
         "welcome": (
             "🏛 **Добро пожаловать в ArchAgent!**\n\n"
-            "📸 **1. Перепланировка:** Отправьте фото здания. (🎁 3 бесплатных кредита!)\n\n"
-            "💬 **2. Чат:** Задавайте вопросы по дизайну."
+            "📸 **1. Дизайн (10 кредитов):** Отправьте фото или создайте с нуля.\n"
+            "💬 **2. Чат (1 кредит):** Советы по дизайну.\n\n"
+            "🎁 У вас **30 бесплатных кредитов**!"
         ),
         "generating": "⏳ Создание вашего дизайна...",
-        "wallet_prompt": "✅ Дизайн готов! Вы можете пополнить баланс через TON Panel.",
-        "upsell": (
-            "🌟 **Ваши кредиты закончились!**\n\n"
-            "Пожалуйста, купите пакет рендеров через TON.\n\n"
-            "💎 **Преимущества:**\n"
-            "🖼 Качество 8K\n🤖 Безлимитный ИИ-чат\n🛒 Магазины и смета\n\n👇 Нажмите для пополнения:"
-        ),
+        "wallet_prompt": "✅ Дизайн готов! Откройте магазин для пополнения.",
+        "upsell": "🌟 **Недостаточно кредитов!**\n\nПополните баланс через TON.\n\n👇 Открыть магазин:",
         "profile": (
             "👤 **Профиль: {name} {icon}**\n"
             "--------------------------\n"
             "👑 Статус: `{status}`\n"
-            "💳 Баланс рендеров: `{credits}`\n"
+            "🪙 Баланс: `{credits}`\n"
+            "ℹ️ *(Фото = 10 кредитов | Чат = 1 кредит)*\n"
             "--------------------------\n"
         ),
-        "payment_success": (
-            "🎉 **Оплата прошла успешно!**\n\n"
-            "Вам начислено **{amount} рендеров**.\n"
-            "💳 Текущий баланс: {credits} рендеров\n\nТеперь у вас статус Premium 💎"
-        ),
-        "premium_btn": "💎 Пополнить баланс (TON)",
-        "ton_panel_btn": "💎 Открыть магазин"
+        "payment_success": "🎉 **Успешно!**\n\nДобавлено **{amount} кредитов**.\n🪙 Баланс: {credits}\nВы Premium 💎",
+        "premium_btn": "💎 Пополнить (TON)",
+        "ton_panel_btn": "💎 Магазин"
     }
 }
