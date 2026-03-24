@@ -6,7 +6,6 @@ DB_PATH = "archagent.db"
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # اضافه شدن ستون referred_by برای سیستم دعوت از دوستان
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -43,7 +42,6 @@ def add_referral(new_user_id, referrer_id):
     if str(new_user_id) == str(referrer_id): return False
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # ثبت معرف و جایزه ۱۰ کریدیتی به دعوت‌کننده
     c.execute("UPDATE users SET referred_by = ? WHERE user_id = ?", (referrer_id, new_user_id))
     c.execute("UPDATE users SET credits = credits + 10 WHERE user_id = ?", (referrer_id,))
     conn.commit()
@@ -53,6 +51,7 @@ def add_referral(new_user_id, referrer_id):
 def add_credits(user_id, amount):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    # آپدیت اعتبار و تغییر وضعیت به پرمیوم
     c.execute("UPDATE users SET credits = credits + ?, is_premium = 1 WHERE user_id = ?", (amount, user_id))
     conn.commit()
     conn.close()
