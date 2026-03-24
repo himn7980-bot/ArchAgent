@@ -1,113 +1,54 @@
 TEXTS = {
     "en": {
-        "welcome": (
-            "🏛 **Welcome to ArchAgent!**\n\n"
-            "I am your AI Architectural Assistant. You can use me for:\n\n"
-            "📸 **1. Image Design (10 Credits):** Send a photo or ask me to design from scratch.\n"
-            "💬 **2. AI Chat (1 Credit):** Ask for architecture and design advice.\n\n"
-            "🎁 You have **30 Free Credits** to start!"
-        ),
-        "generating": "⏳ Analyzing architecture and generating your design...",
-        "wallet_prompt": "✅ Generation complete! You can regenerate, change style, or open the Store.",
-        "upsell": (
-            "🌟 **Insufficient Credits!**\n\n"
-            "You need more credits to perform this action. Top up your account using TON to continue.\n\n"
-            "👇 Click the button below to open the store:"
-        ),
-        "profile": (
-            "👤 **User Profile: {name} {icon}**\n"
-            "--------------------------\n"
-            "👑 Status: `{status}`\n"
-            "🪙 Balance: `{credits} Credits`\n"
-            "ℹ️ *(1 Image = 10 Credits | 1 Chat = 1 Credit)*\n"
-            "--------------------------\n"
-        ),
-        "payment_success": (
-            "🎉 **Payment Successful!**\n\n"
-            "**{amount} Credits** have been added to your account.\n"
-            "🪙 Current Balance: {credits} Credits\n\n"
-            "You are now a Premium member 💎"
-        ),
-        "premium_btn": "💎 Buy Credits (TON)",
-        "ton_panel_btn": "💎 Open Store"
+        "welcome": "🏛 **Welcome to ArchAgent!**\n\n📸 **1. Design (10 Credits):** Send a photo or describe a scene.\n💬 **2. AI Chat (1 Credit):** Expert architectural advice.\n\n🎁 You have **30 Free Credits**!",
+        "generating": "⏳ Generating your architectural masterpiece...",
+        "wallet_prompt": "✅ Render complete! Visit the store to top-up.",
+        "upsell": "🌟 **Insufficient Credits!**\n\nPlease top up your account using TON to continue.",
+        "profile": "👤 **Profile: {name} {icon}**\n👑 Status: `{status}`\n🪙 Balance: `{credits} Credits`",
+        "payment_success": "🎉 **Success!** {amount} Credits added. Total: {credits}",
+        "invite_btn": "🤝 Build Your Network (+10 💎)",
+        "share_msg": "Design your space with ArchAgent AI! Get free credits here:",
+        "referral_success": "🎁 **Bonus!** Your friend joined. You earned 10 Credits!",
+        "ton_panel_btn": "💎 Open Store",
+        "premium_btn": "💎 Buy Credits (TON)"
     },
-    
     "fa": {
-        "welcome": (
-            "🏛 **به ArchAgent خوش آمدید!**\n\n"
-            "من دستیار هوشمند معماری شما هستم:\n\n"
-            "📸 **۱. طراحی عکس (۱۰ کریدیت):** یک عکس بفرستید یا بخواهید از صفر طراحی کنم.\n"
-            "💬 **۲. چت هوشمند (۱ کریدیت):** مشاوره معماری بگیرید.\n\n"
-            "🎁 شما **۳۰ کریدیت رایگان** برای شروع دارید!"
-        ),
-        "generating": "⏳ در حال تحلیل معماری و تولید رندر اختصاصی...",
-        "wallet_prompt": "✅ رندر آماده شد! می‌توانید دوباره رندر بگیرید یا برای شارژ حساب وارد فروشگاه شوید.",
-        "upsell": (
-            "🌟 **موجودی کافی نیست!**\n\n"
-            "برای این عملیات کریدیت کافی ندارید. لطفاً از طریق پنل TON حساب خود را شارژ کنید.\n\n"
-            "👇 برای شارژ حساب کلیک کنید:"
-        ),
-        "profile": (
-            "👤 **پروفایل کاربری: {name} {icon}**\n"
-            "--------------------------\n"
-            "👑 وضعیت: `{status}`\n"
-            "🪙 موجودی: `{credits} کریدیت`\n"
-            "ℹ️ *(هر عکس = ۱۰ کریدیت | هر پیام چت = ۱ کریدیت)*\n"
-            "--------------------------\n"
-        ),
-        "payment_success": (
-            "🎉 **پرداخت موفقیت‌آمیز بود!**\n\n"
-            "تعداد **{amount} کریدیت** به حساب شما اضافه شد.\n"
-            "🪙 موجودی فعلی شما: {credits} کریدیت\n\n"
-            "حساب شما به Premium ارتقا یافت 💎"
-        ),
-        "premium_btn": "💎 شارژ حساب (TON)",
-        "ton_panel_btn": "💎 فروشگاه پکیج‌ها"
+        "welcome": "🏛 **به ArchAgent خوش آمدید!**\n\n📸 **۱. طراحی (۱۰ کریدیت):** عکس بفرستید یا فضا را توصیف کنید.\n💬 **۲. چت هوشمند (۱ کریدیت):** مشاوره تخصصی معماری.\n\n🎁 شما **۳۰ کریدیت رایگان** دارید!",
+        "generating": "⏳ در حال خلق ایده معماری شما...",
+        "wallet_prompt": "✅ طراحی آماده شد! برای شارژ حساب وارد فروشگاه شوید.",
+        "upsell": "🌟 **موجودی کافی نیست!**\n\nلطفاً از طریق پنل TON حساب خود را شارژ کنید.",
+        "profile": "👤 **پروفایل: {name} {icon}**\n👑 وضعیت: `{status}`\n🪙 موجودی: `{credits} کریدیت`",
+        "payment_success": "🎉 **موفقیت‌آمیز!** {amount} کریدیت اضافه شد. موجودی: {credits}",
+        "invite_btn": "🤝 دعوت از همکاران (+۱۰ امتیاز)",
+        "share_msg": "فضاتو با هوش مصنوعی طراحی کن! با لینک من امتیاز رایگان بگیر:",
+        "referral_success": "🎁 **تبریک!** دوست شما دعوت را پذیرفت و ۱۰ کریدیت جایزه گرفتید!",
+        "ton_panel_btn": "💎 فروشگاه پکیج‌ها",
+        "premium_btn": "💎 شارژ حساب (TON)"
     },
-
     "ar": {
-        "welcome": (
-            "🏛 **مرحباً بك في ArchAgent!**\n\n"
-            "📸 **1. تصميم (10 رصيد):** أرسل صورة أو اطلب تصميماً.\n"
-            "💬 **2. محادثة ذكية (1 رصيد):** استشارة معمارية.\n\n"
-            "🎁 لديك **30 رصيد مجاني**!"
-        ),
-        "generating": "⏳ جاري توليد تصميمك...",
-        "wallet_prompt": "✅ اكتمل التصميم! يمكنك استخدام المتجر لشراء رصيد.",
-        "upsell": "🌟 **رصيد غير كافٍ!**\n\nيرجى شحن حسابك عبر TON للمتابعة.\n\n👇 اضغط للشحن:",
-        "profile": (
-            "👤 **الملف الشخصي: {name} {icon}**\n"
-            "--------------------------\n"
-            "👑 الحالة: `{status}`\n"
-            "🪙 الرصيد: `{credits}`\n"
-            "ℹ️ *(صورة = 10 رصيد | رسالة = 1 رصيد)*\n"
-            "--------------------------\n"
-        ),
-        "payment_success": "🎉 **تم الدفع!**\n\nأضيف **{amount} رصيد**.\n🪙 الرصيد الحالي: {credits}\nأنت Premium 💎",
-        "premium_btn": "💎 شراء رصيد (TON)",
-        "ton_panel_btn": "💎 المتجر"
+        "welcome": "🏛 **مرحباً بك في ArchAgent!**\n\n📸 **1. تصميم (10 رصيد):** أرسل صورة أو صف مشهداً.\n💬 **2. استشارة (1 رصيد):** نصيحة معمارية.\n\n🎁 لديك **30 رصيد مجاني**!",
+        "generating": "⏳ جاري توليد تصميمك المعماری...",
+        "wallet_prompt": "✅ اكتمل التصميم! قم بزيارة المتجر للشحن.",
+        "upsell": "🌟 **رصيد غير كافٍ!**\n\nيرجى شحن حسابك عبر TON للمتابعة.",
+        "profile": "👤 **الملف الشخصي: {name} {icon}**\n👑 الحالة: `{status}`\n🪙 الرصيد: `{credits}`",
+        "payment_success": "🎉 **تم الدفع!** أضيف {amount} رصيد. المجموع: {credits}",
+        "invite_btn": "🤝 دعوة الزملاء (+١٠ رصيد)",
+        "share_msg": "صمم مساحتك بالذكاء الاصطناعي! احصل على رصيد مجاني هنا:",
+        "referral_success": "🎁 **مكافأة!** انضم صديقك وحصلت على ١٠ أرصدة!",
+        "ton_panel_btn": "💎 المتجر",
+        "premium_btn": "💎 شراء رصيد (TON)"
     },
-
     "ru": {
-        "welcome": (
-            "🏛 **Добро пожаловать в ArchAgent!**\n\n"
-            "📸 **1. Дизайн (10 кредитов):** Отправьте фото или создайте с нуля.\n"
-            "💬 **2. Чат (1 кредит):** Советы по дизайну.\n\n"
-            "🎁 У вас **30 бесплатных кредитов**!"
-        ),
-        "generating": "⏳ Создание вашего дизайна...",
+        "welcome": "🏛 **Добро пожаловать в ArchAgent!**\n\n📸 **1. Дизайн (10 кр.):** Фото یا описание.\n💬 **2. Чат (1 кр.):** Советы профи.\n\n🎁 У вас **30 бесплатных кредитов**!",
+        "generating": "⏳ Создание вашего архитектурного шедевра...",
         "wallet_prompt": "✅ Дизайн готов! Откройте магазин для пополнения.",
-        "upsell": "🌟 **Недостаточно кредитов!**\n\nПополните баланс через TON.\n\n👇 Открыть магазин:",
-        "profile": (
-            "👤 **Профиль: {name} {icon}**\n"
-            "--------------------------\n"
-            "👑 Статус: `{status}`\n"
-            "🪙 Баланс: `{credits}`\n"
-            "ℹ️ *(Фото = 10 кредитов | Чат = 1 кредит)*\n"
-            "--------------------------\n"
-        ),
-        "payment_success": "🎉 **Успешно!**\n\nДобавлено **{amount} кредитов**.\n🪙 Баланс: {credits}\nВы Premium 💎",
-        "premium_btn": "💎 Пополнить (TON)",
-        "ton_panel_btn": "💎 Магазин"
+        "upsell": "🌟 **Недостаточно кредитов!**\n\nПополните баланс через TON.",
+        "profile": "👤 **Профиль: {name} {icon}**\n👑 Статус: `{status}`\n🪙 Баланс: `{credits}`",
+        "payment_success": "🎉 **Успешно!** Добавлено {amount}. Итого: {credits}",
+        "invite_btn": "🤝 Пригласить коллег (+10 💎)",
+        "share_msg": "Создай свой дизайн с ИИ! Получи бесплатные кредиты по ссылке:",
+        "referral_success": "🎁 **Бонус!** Ваш друг присоединился. Вы получили 10 кредитов!",
+        "ton_panel_btn": "💎 Магазин",
+        "premium_btn": "💎 Пополнить (TON)"
     }
 }
