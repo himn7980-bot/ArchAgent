@@ -349,7 +349,6 @@ MY_WALLET_ADDRESS = "UQDPVUpClyvBg0GXnl-IHVB6Q5I_CRp-psFhkasI-uPMpUfm"
 @app_web.get("/ping")
 def health(): return {"ArchAgent": "running", "status": "200 OK"}
 
-# ساخت خودکار مانیفست با دامنه سرور شما
 @app_web.get("/tonconnect-manifest.json")
 def get_manifest(request: Request):
     base_url = str(request.base_url).rstrip("/")
@@ -418,7 +417,6 @@ def webapp():
             const tg = window.Telegram.WebApp;
             tg.expand();
 
-            // تشخیص خودکار دامنه برای اتصال ایمن مانیفست
             const manifestUrl = window.location.origin + '/tonconnect-manifest.json';
             
             const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({{
@@ -434,12 +432,13 @@ def webapp():
             async function buyPackage(pkgType, priceTon) {{
                 try {{
                     const nanoTon = parseFloat(priceTon) * 1000000000;
+                    
+                    // دقت کن! بخش payload کاملاً از اینجا حذف شده تا تراکنش فوری قبول بشه
                     const transaction = {{
                         validUntil: Math.floor(Date.now() / 1000) + 360,
                         messages: [{{
                             address: "{MY_WALLET_ADDRESS}",
-                            amount: nanoTon.toString(),
-                            payload: ""
+                            amount: nanoTon.toString()
                         }}]
                     }};
 
@@ -449,8 +448,6 @@ def webapp():
                     await tonConnectUI.sendTransaction(transaction);
                     
                     document.getElementById('status-msg').innerText = "✅ Success! Returning to bot...";
-                    
-                    // ارسال پیام خرید موفق به ربات تلگرام
                     tg.sendData(JSON.stringify({{action: "payment_success", package: pkgType}}));
                     
                 }} catch (e) {{
