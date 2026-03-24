@@ -7,7 +7,7 @@ from PIL import Image
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware  # اضافه شدن CORS برای حل مشکل کیف پول
+from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncOpenAI
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -165,9 +165,36 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     lang = get_user_lang(update)
-    database.create_user_if_not_exists(user_id, lang)
+    
+    # مدیریت رفرال
+    is_new = database.create_user_if_not_exists(user_id, lang)
+    if is_new and context.args and context.args[0].isdigit():
+        referrer_id = int(context.args[0])
+        if database.add_referral(user_id, referrer_id):
+            try:
+                # اطلاع‌رسانی به معرف به زبان خودش
+                ref_user = database.get_user(referrer_id)
+                ref_lang = ref_user["lang"] if ref_user else "en"
+                await context.bot.send_message(
+                    chat_id=referrer_id, 
+                    text=TEXTS.get(ref_lang, TEXTS["en"])["referral_success"]
+                )
+            except: pass
+
     reset_user_flow(context)
-    await update.message.reply_text(t(update, context, "welcome"), reply_markup=get_upsell_keyboard(update, context), parse_mode="Markdown")
+    
+    # ساخت لینک اختصاصی رفرال
+    bot_obj = await context.bot.get_me()
+    invite_link = f"https://t.me/{bot_obj.username}?start={user_id}"
+    
+    # دکمه‌ها
+    lang_data = TEXTS.get(lang, TEXTS["en"])
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(lang_data["ton_panel_btn"], web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))],
+        [InlineKeyboardButton(lang_data["invite_btn"], switch_inline_query=f"\n{lang_data['share_msg']}\n{invite_link}")]
+    ])
+    
+    await update.message.reply_text(lang_data["welcome"], reply_markup=keyboard, parse_mode="Markdown")
 
 async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -345,7 +372,6 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 app_web = FastAPI()
 
-# فعال‌سازی CORS برای رفع قطعی بلاکچین TON
 app_web.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -442,7 +468,6 @@ def webapp():
 
             async function buyPackage(pkgType, priceTon) {{
                 try {{
-                    // حل مشکل اعشار با Math.floor
                     const nanoTon = Math.floor(parseFloat(priceTon) * 1000000000);
                     
                     const transaction = {{
@@ -462,7 +487,6 @@ def webapp():
                     tg.sendData(JSON.stringify({{action: "payment_success", package: pkgType}}));
                     
                 }} catch (e) {{
-                    // الان اگر اروری رخ بده، دقیقاً دلیل فنیش رو بهمون پاپ‌آپ میده
                     alert("⚠️ Error Details: " + e.message); 
                     document.getElementById('status-msg').style.color = "#FF5252";
                     document.getElementById('status-msg').innerText = "❌ Payment failed or cancelled.";
