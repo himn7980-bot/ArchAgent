@@ -5,8 +5,8 @@ import json
 from PIL import Image
 
 import uvicorn
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from openai import AsyncOpenAI
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -32,7 +32,10 @@ from storage import create_project
 from prompt_engine import PromptEngine
 import database
 
+# راه‌اندازی دیتابیس
 database.init_db()
+
+# راه‌اندازی کلاینت OpenAI
 openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # =========================
@@ -104,7 +107,6 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
     user_id = update.effective_user.id
     db_user = database.get_user(user_id)
     
-    # برای ساخت عکس 10 کریدیت لازم است
     if not db_user or db_user["credits"] < 10:
         return await update.message.reply_text(t(update, context, "upsell"), reply_markup=get_upsell_keyboard(update, context), parse_mode="Markdown")
 
@@ -112,7 +114,6 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
     if not data.get("photo_path") or not os.path.exists(data["photo_path"]):
         return await update.message.reply_text("⚠️ Please send a photo first.")
 
-    # کسر 10 کریدیت
     database.deduct_credit(user_id, amount=10)
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
@@ -153,7 +154,7 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
 
     except Exception as e:
         print(f"Error: {e}")
-        database.add_credits(user_id, 10) # بازگرداندن کریدیت
+        database.add_credits(user_id, 10) 
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
 # =========================
@@ -240,7 +241,6 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_request(update, context, text)
     else:
         db_user = database.get_user(user_id)
-        # برای شروع چت حداقل ۱ کریدیت نیاز است
         if not db_user or db_user["credits"] < 1:
             return await update.message.reply_text(t(update, context, "upsell"), reply_markup=get_upsell_keyboard(update, context), parse_mode="Markdown")
 
@@ -264,7 +264,6 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ai_reply = response.choices[0].message.content.strip()
 
             if ai_reply.startswith("[GENERATE]"):
-                # برای تولید عکس از صفر 10 کریدیت چک می‌شود
                 if db_user["credits"] < 10:
                     return await update.message.reply_text(t(update, context, "upsell"), reply_markup=get_upsell_keyboard(update, context), parse_mode="Markdown")
                 
@@ -283,7 +282,6 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     with open(generated, "rb") as img:
                         await update.message.reply_photo(img, caption="🎨 طرح پیشنهادی دستیار")
             else:
-                # پیام متنی عادی، فقط ۱ کریدیت کسر می‌شود
                 database.deduct_credit(user_id, amount=1)
                 await update.message.reply_text(ai_reply)
 
@@ -351,6 +349,16 @@ MY_WALLET_ADDRESS = "UQDPVUpClyvBg0GXnl-IHVB6Q5I_CRp-psFhkasI-uPMpUfm"
 @app_web.get("/ping")
 def health(): return {"ArchAgent": "running", "status": "200 OK"}
 
+# ساخت خودکار مانیفست با دامنه سرور شما
+@app_web.get("/tonconnect-manifest.json")
+def get_manifest(request: Request):
+    base_url = str(request.base_url).rstrip("/")
+    return JSONResponse({
+        "url": base_url,
+        "name": "ArchAgent Store",
+        "iconUrl": "https://cdn-icons-png.flaticon.com/512/2830/2830305.png"
+    })
+
 @app_web.get("/webapp/index.html")
 def webapp():
     html_content = f"""
@@ -363,7 +371,7 @@ def webapp():
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
         <style>
-            body {{ font-family: sans-serif; background-color: #181818; color: white; text-align: center; padding: 20px; }}
+            body {{ font-family: sans-serif; background-color: #181818; color: white; text-align: center; padding: 20px; margin: 0; }}
             .container {{ max-width: 400px; margin: auto; }}
             .package-card {{ background: #222; border: 1px solid #333; border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }}
             .package-info {{ text-align: left; }}
@@ -410,8 +418,11 @@ def webapp():
             const tg = window.Telegram.WebApp;
             tg.expand();
 
+            // تشخیص خودکار دامنه برای اتصال ایمن مانیفست
+            const manifestUrl = window.location.origin + '/tonconnect-manifest.json';
+            
             const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({{
-                manifestUrl: 'https://raw.githubusercontent.com/ton-community/tutorials/main/03-client/test/public/tonconnect-manifest.json',
+                manifestUrl: manifestUrl,
                 buttonRootId: 'ton-connect'
             }});
 
@@ -432,11 +443,16 @@ def webapp():
                         }}]
                     }};
 
+                    document.getElementById('status-msg').style.color = "#4CAF50";
                     document.getElementById('status-msg').innerText = "⏳ Confirm transaction in your wallet...";
+                    
                     await tonConnectUI.sendTransaction(transaction);
                     
                     document.getElementById('status-msg').innerText = "✅ Success! Returning to bot...";
+                    
+                    // ارسال پیام خرید موفق به ربات تلگرام
                     tg.sendData(JSON.stringify({{action: "payment_success", package: pkgType}}));
+                    
                 }} catch (e) {{
                     document.getElementById('status-msg').style.color = "#FF5252";
                     document.getElementById('status-msg').innerText = "❌ Payment failed or cancelled.";
