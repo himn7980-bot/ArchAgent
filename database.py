@@ -1,7 +1,6 @@
 import sqlite3
 import os
 
-# دیتابیس دقیقاً کنار فایل‌های پروژه ساخته می‌شود (عالی برای تست و هکاتون)
 DB_PATH = "archagent.db"
 
 def init_db():
@@ -10,7 +9,7 @@ def init_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
-            credits INTEGER DEFAULT 3,
+            credits INTEGER DEFAULT 30,
             is_premium INTEGER DEFAULT 0,
             lang TEXT DEFAULT 'en'
         )
@@ -32,7 +31,7 @@ def create_user_if_not_exists(user_id, lang="en"):
     if not get_user(user_id):
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("INSERT INTO users (user_id, credits, is_premium, lang) VALUES (?, 3, 0, ?)", (user_id, lang))
+        c.execute("INSERT INTO users (user_id, credits, is_premium, lang) VALUES (?, 30, 0, ?)", (user_id, lang))
         conn.commit()
         conn.close()
 
@@ -46,14 +45,13 @@ def update_user_lang(user_id, lang):
 def add_credits(user_id, amount):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # با خرید بسته، هم کریدیت اضافه می‌شود و هم کاربر Premium می‌شود
     c.execute("UPDATE users SET credits = credits + ?, is_premium = 1 WHERE user_id = ?", (amount, user_id))
     conn.commit()
     conn.close()
 
-def deduct_credit(user_id):
+def deduct_credit(user_id, amount=1):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("UPDATE users SET credits = credits - 1 WHERE user_id = ? AND credits > 0", (user_id,))
+    c.execute("UPDATE users SET credits = credits - ? WHERE user_id = ? AND credits >= ?", (amount, user_id, amount))
     conn.commit()
     conn.close()
