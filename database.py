@@ -1,12 +1,12 @@
 import sqlite3
 import os
 
-DB_PATH = "arch_agent.db"
+DB_PATH = "archagent.db"
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # اضافه کردن ستون referred_by برای ردیابی دعوت‌ها
+    # اضافه شدن ستون referred_by برای سیستم دعوت از دوستان
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -19,26 +19,41 @@ def init_db():
     conn.commit()
     conn.close()
 
-def create_user_if_not_exists(user_id, lang='en'):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO users (user_id, lang) VALUES (?, ?)", (user_id, lang))
-    conn.commit()
-    conn.close()
-
 def get_user(user_id):
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+    c.execute("SELECT credits, is_premium, lang, referred_by FROM users WHERE user_id = ?", (user_id,))
     row = c.fetchone()
     conn.close()
-    return dict(row) if row else None
+    if row:
+        return {"credits": row[0], "is_premium": bool(row[1]), "lang": row[2], "referred_by": row[3]}
+    return None
+
+def create_user_if_not_exists(user_id, lang="en"):
+    if not get_user(user_id):
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("INSERT INTO users (user_id, credits, is_premium, lang) VALUES (?, 30, 0, ?)", (user_id, lang))
+        conn.commit()
+        conn.close()
+        return True
+    return False
+
+def add_referral(new_user_id, referrer_id):
+    if str(new_user_id) == str(referrer_id): return False
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    # ثبت معرف و جایزه ۱۰ کریدیتی به دعوت‌کننده
+    c.execute("UPDATE users SET referred_by = ? WHERE user_id = ?", (referrer_id, new_user_id))
+    c.execute("UPDATE users SET credits = credits + 10 WHERE user_id = ?", (referrer_id,))
+    conn.commit()
+    conn.close()
+    return True
 
 def add_credits(user_id, amount):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("UPDATE users SET credits = credits + ? WHERE user_id = ?", (amount, user_id))
+    c.execute("UPDATE users SET credits = credits + ?, is_premium = 1 WHERE user_id = ?", (amount, user_id))
     conn.commit()
     conn.close()
 
@@ -55,24 +70,3 @@ def update_user_lang(user_id, lang):
     c.execute("UPDATE users SET lang = ? WHERE user_id = ?", (lang, user_id))
     conn.commit()
     conn.close()
-
-# تابع حیاتی برای سیستم رفرال
-def add_referral(new_user_id, referrer_id):
-    if str(new_user_id) == str(referrer_id): return False
-    
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT referred_by FROM users WHERE user_id = ?", (new_user_id,))
-    row = c.fetchone()
-    
-    # اگر کاربر قبلاً وجود نداشته یا رفرال نداشته
-    if row is None or row[0] is None:
-        # ثبت معرف
-        c.execute("UPDATE users SET referred_by = ? WHERE user_id = ?", (referrer_id, new_user_id))
-        # جایزه ۱۰ کریدیت به معرف (چون سخاوتمندانه است!)
-        c.execute("UPDATE users SET credits = credits + 10 WHERE user_id = ?", (referrer_id,))
-        conn.commit()
-        conn.close()
-        return True
-    conn.close()
-    return False
