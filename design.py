@@ -1,15 +1,24 @@
 import os
+import random
 from typing import Optional, Union
 import requests
 
 from config import (
     STABILITY_API_KEY,
     STABILITY_API_HOST,
+    STABILITY_IMAGE_MODEL,
     STABILITY_OUTPUT_FORMAT,
+    STABILITY_SEED,
     OUTPUT_DIR,
 )
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+def _build_endpoint() -> str:
+    # برای معماری، این آدرس باید به control/structure ختم شود
+    model_path = STABILITY_API_MODEL.strip().lstrip("/")
+    return f"{STABILITY_API_HOST}/v2beta/{model_path}"
 
 
 def generate_design(input_image_path: str, mask_path: Optional[str], prompt_data: Union[dict, str]) -> str:
@@ -25,26 +34,38 @@ def generate_design(input_image_path: str, mask_path: Optional[str], prompt_data
         negative_prompt = prompt_data.get("negative_prompt", "").strip()
     else:
         positive_prompt = str(prompt_data).strip()
-        negative_prompt = "cartoon, low quality, bad architecture, warped lines, messy geometry, flat lighting"
+        negative_prompt = "cartoon, low quality, warped, messy, changing wall structure"
 
     if not positive_prompt:
         raise ValueError("Prompt is empty.")
 
-    # 🚀 تغییر استراتژیک به قدرتمندترین موتور استبیلیتی برای تغییر متریال و رنگ
-    endpoint = f"{STABILITY_API_HOST}/v2beta/stable-image/generate/sd3"
+    endpoint = _build_endpoint()
+    output_format = _normalize_output_format(STABILITY_OUTPUT_FORMAT)
 
     headers = {
         "Authorization": f"Bearer {STABILITY_API_KEY}",
         "Accept": "image/*",
     }
 
+    # --- 🛠 تغییر حیاتی: بازگشت به وفاداری ساختاری ---
+    # عدد جادویی برای معماری: 0.65 (۶۵٪ وفاداری به خطوط، ۳۵٪ تغییر متریال)
+    # این عدد تضمین می‌کند جای کابینت‌ها تکان نخورد.
+    optimal_strength = 0.65
+
+    # تولید عدد رندوم واقعی اگر در کانفیگ 0 باشد
+    current_seed = _normalize_seed(STABILITY_SEED)
+    if current_seed == 0:
+        current_seed = random.randint(1000000, 9999999)
+
     data = {
         "prompt": positive_prompt,
         "negative_prompt": negative_prompt,
-        "mode": "image-to-image",  # 👈 دستور صریح برای پردازش تصویر روی تصویر
-        "strength": "0.75",        # 👈 75 درصد تغییر (تضمین سبز شدن کابینت‌ها)
-        "output_format": _normalize_output_format(STABILITY_OUTPUT_FORMAT),
-        "model": "sd3"
+        "output_format": output_format,
+        "seed": str(current_seed),
+        # ارسال هر دو پارامتر برای تضمین عملکرد
+        "strength": str(optimal_strength), 
+        "control_strength": str(optimal_strength),
+        "cfg_scale": "9.0"  # 👈 بالا بردن برای توجه بیشتر هوش مصنوعی به پرامپت (شب شدن و سبز شدن)
     }
 
     files = {
@@ -61,19 +82,13 @@ def generate_design(input_image_path: str, mask_path: Optional[str], prompt_data
         )
     finally:
         for f in files.values():
-            try:
-                f.close()
-            except Exception:
-                pass
+            try: f.close()
+            except Exception: pass
 
     if response.status_code != 200:
         raise RuntimeError(f"Stability API Error {response.status_code}: {response.text}")
 
-    # ذخیره و بازگرداندن فایل نهایی
-    output_format = data["output_format"]
-    ext = "jpg" if output_format == "jpeg" else output_format
-    output_path = os.path.join(OUTPUT_DIR, f"last_result.{ext}")
-    
+    output_path = os.path.join(OUTPUT_DIR, f"last_result.jpg")
     with open(output_path, "wb") as f:
         f.write(response.content)
 
@@ -82,6 +97,8 @@ def generate_design(input_image_path: str, mask_path: Optional[str], prompt_data
 
 def _normalize_output_format(fmt: str) -> str:
     fmt = (fmt or "jpeg").strip().lower()
-    if fmt in {"png", "jpeg", "webp"}:
-        return fmt
-    return "jpeg"
+    return fmt if fmt in {"png", "jpeg", "webp"} else "jpeg"
+
+def _normalize_seed(seed: int) -> int:
+    try: return max(0, int(seed))
+    except: return 0
