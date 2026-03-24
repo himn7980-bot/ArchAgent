@@ -1,12 +1,12 @@
 import sqlite3
 import os
 
+# دیتابیس دقیقاً کنار فایل‌های پروژه ساخته می‌شود (عالی برای تست و هکاتون)
 DB_PATH = "archagent.db"
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # ساخت جدول کاربران اگر وجود نداشته باشد
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -32,7 +32,6 @@ def create_user_if_not_exists(user_id, lang="en"):
     if not get_user(user_id):
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        # به هر کاربر جدید ۳ کریدیت (رندر رایگان) می‌دهیم
         c.execute("INSERT INTO users (user_id, credits, is_premium, lang) VALUES (?, 3, 0, ?)", (user_id, lang))
         conn.commit()
         conn.close()
@@ -47,7 +46,7 @@ def update_user_lang(user_id, lang):
 def add_credits(user_id, amount):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # با خرید کریدیت، کاربر به صورت خودکار پریمیوم هم می‌شود
+    # با خرید بسته، هم کریدیت اضافه می‌شود و هم کاربر Premium می‌شود
     c.execute("UPDATE users SET credits = credits + ?, is_premium = 1 WHERE user_id = ?", (amount, user_id))
     conn.commit()
     conn.close()
