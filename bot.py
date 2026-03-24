@@ -32,10 +32,10 @@ from storage import create_project
 from prompt_engine import PromptEngine
 import database
 
-# مقداردهی دیتابیس در زمان اجرا
+# ساخت یا بارگذاری دیتابیس در همان ابتدای اجرا
 database.init_db()
 
-# راه‌اندازی کلاینت OpenAI
+# راه‌اندازی کلاینت OpenAI (یادت نره OPENAI_API_KEY رو در Render ست کنی)
 openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # =========================
@@ -54,7 +54,6 @@ def get_user_lang(update: Update):
     db_user = database.get_user(user_id)
     if db_user:
         return db_user["lang"]
-    
     lang = (update.effective_user.language_code or "en").lower()
     if lang.startswith("fa"): return "fa"
     if lang.startswith("ar"): return "ar"
@@ -104,7 +103,7 @@ def result_keyboard(update, context, project_id):
         [
             InlineKeyboardButton(
                 btn_text,
-                web_app=WebAppInfo(url=f"{MINIAPP_URL}?project_id={project_id}&user_id={update.effective_user.id}")
+                web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={update.effective_user.id}")
             ),
             InlineKeyboardButton("🖼 Mint NFT", callback_data="mint_hint"),
         ],
@@ -118,10 +117,10 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
     user_id = update.effective_user.id
     db_user = database.get_user(user_id)
     
+    # بررسی موجودی کاربر از دیتابیس
     if not db_user or db_user["credits"] <= 0:
         upsell_text = t(update, context, "upsell")
         btn_text = t(update, context, "premium_btn")
-        
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))
         ]])
@@ -131,7 +130,7 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
     if not data.get("photo_path") or not os.path.exists(data["photo_path"]):
         return await update.message.reply_text("⚠️ Please send a photo first.")
 
-    # کسر کریدیت از دیتابیس
+    # کسر یک کریدیت
     database.deduct_credit(user_id)
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
@@ -187,7 +186,7 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
 
     except Exception as e:
         print(f"Error: {e}")
-        # بازگرداندن کریدیت در صورت خطا
+        # در صورت بروز خطا، کریدیت را به کاربر برمی‌گردانیم
         database.add_credits(user_id, 1)
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
@@ -199,7 +198,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     lang = get_user_lang(update)
     
-    # ساخت حساب کاربری در دیتابیس با 3 کریدیت رایگان اولیه
+    # ساخت پروفایل در دیتابیس (با ۳ رندر هدیه)
     database.create_user_if_not_exists(user_id, lang)
     
     reset_user_flow(context)
@@ -228,10 +227,8 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         name=user_name, icon=icon, status=status, credits=credits
     )
     
-    # دکمه خرید در پروفایل
     btn_text = t(update, context, "ton_panel_btn")
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))]])
-    
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
 async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -246,10 +243,10 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
             elif pkg == "pro": added_credits = 35
             elif pkg == "master": added_credits = 80
                 
-            # اضافه کردن کریدیت به دیتابیس
+            # افزایش کریدیت در دیتابیس
             database.add_credits(user_id, added_credits)
             
-            # خواندن موجودی جدید برای پیام موفقیت
+            # خواندن موجودی جدید برای ارسال پیام تبریک
             db_user = database.get_user(user_id)
             current_credits = db_user["credits"]
             
@@ -301,7 +298,6 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.effective_user.id
     
-    # آپدیت زبان کاربر در دیتابیس بر اساس متن
     lang = detect_message_lang(text)
     database.update_user_lang(user_id, lang)
 
@@ -310,12 +306,13 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text("⚠️ لطفا ابتدا یک عکس از فضا ارسال کنید.")
         await process_request(update, context, text)
     else:
+        # دستیار هوشمند فقط برای کاربران پریمیوم
         db_user = database.get_user(user_id)
         if not db_user or not db_user["is_premium"]:
             upsell_text = t(update, context, "upsell")
             btn_text = t(update, context, "premium_btn")
             keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))]])
-            return await update.message.reply_text("🌟 चت با هوش مصنوعی مختص کاربران Premium است.\n\n" + upsell_text, reply_markup=keyboard, parse_mode="Markdown")
+            return await update.message.reply_text("🌟 چت با هوش مصنوعی مختص کاربران Premium است.\n\n" + upsell_text, reply_markup=keyboard, parse_mode="Markdown")
 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         system_prompt = (
@@ -334,7 +331,33 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             await update.message.reply_text(response.choices[0].message.content)
         except Exception as e:
+            print(f"OpenAI Error: {e}")
             await update.message.reply_text("❌ خطا در ارتباط با دستیار هوشمند.")
+
+async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.user_data.get("photo_path") or not os.path.exists(context.user_data["photo_path"]):
+        return await update.message.reply_text("⚠️ Please send a photo first.")
+
+    path = os.path.join(UPLOAD_DIR, f"voice_{update.effective_user.id}.ogg")
+    
+    try:
+        file = await context.bot.get_file(update.message.voice.file_id)
+        await file.download_to_drive(path)
+
+        transcription = transcribe_voice(path)
+        text = transcription.get("text", "")
+        
+        if not text:
+            return await update.message.reply_text("Could not understand the voice.")
+            
+        await update.message.reply_text(f"🎤 You said: {text}")
+        context.user_data["awaiting_description"] = True
+        await process_request(update, context, text)
+    except Exception as e:
+        await update.message.reply_text("Error processing voice message.")
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
 
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
