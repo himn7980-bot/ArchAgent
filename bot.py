@@ -6,6 +6,7 @@ from PIL import Image
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from openai import AsyncOpenAI
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.constants import ChatAction
@@ -29,6 +30,8 @@ from stores import get_store_suggestions
 from storage import create_project
 from prompt_engine import PromptEngine
 
+# راه‌اندازی کلاینت OpenAI برای دستیار هوشمند معماری
+openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # =========================
 # Language & Helpers
@@ -41,7 +44,6 @@ def detect_message_lang(text: str) -> str:
     if any("\u0400" <= ch <= "\u04FF" for ch in text): return "ru"
     return "en"
 
-
 def get_user_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     saved = context.user_data.get("lang")
     if saved: return saved
@@ -51,18 +53,15 @@ def get_user_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     if lang.startswith("ru"): return "ru"
     return "en"
 
-
 def t(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
     lang = get_user_lang(update, context)
     return TEXTS.get(lang, TEXTS["en"]).get(key, key)
-
 
 def reset_user_flow(context):
     lang = context.user_data.get("lang")
     context.user_data.clear()
     if lang:
         context.user_data["lang"] = lang
-
 
 # =========================
 # Keyboards
@@ -76,13 +75,11 @@ def style_keyboard():
         [InlineKeyboardButton("🔄 Restart", callback_data="restart"), InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
     ])
 
-
 def time_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("☀️ Day", callback_data="time_day"), InlineKeyboardButton("🌙 Night", callback_data="time_night")],
         [InlineKeyboardButton("🌅 Sunset", callback_data="time_sunset"), InlineKeyboardButton("⏭ Skip", callback_data="time_skip")]
     ])
-
 
 def weather_keyboard():
     return InlineKeyboardMarkup([
@@ -90,8 +87,10 @@ def weather_keyboard():
         [InlineKeyboardButton("❄ Snow", callback_data="weather_snow"), InlineKeyboardButton("⏭ Skip", callback_data="weather_skip")]
     ])
 
-
-def result_keyboard(update, project_id):
+def result_keyboard(update, context, project_id):
+    # دریافت نام دکمه پنل بر اساس زبان کاربر
+    btn_text = t(update, context, "ton_panel_btn")
+    
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🔁 Regenerate", callback_data="redo"),
@@ -99,13 +98,12 @@ def result_keyboard(update, project_id):
         ],
         [
             InlineKeyboardButton(
-                "💰 TON Panel",
+                btn_text,
                 web_app=WebAppInfo(url=f"{MINIAPP_URL}?project_id={project_id}&user_id={update.effective_user.id}")
             ),
             InlineKeyboardButton("🖼 Mint NFT", callback_data="mint_hint"),
         ],
     ])
-
 
 # =========================
 # Core AI Process
@@ -114,6 +112,21 @@ def result_keyboard(update, project_id):
 async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, user_text: str):
     data = context.user_data
     
+    # بررسی محدودیت رندرهای رایگان (Premium Check)
+    render_count = data.get("render_count", 0)
+    is_premium = data.get("is_premium", False)
+
+    if render_count >= 3 and not is_premium:
+        upsell_text = t(update, context, "upsell")
+        btn_text = t(update, context, "premium_btn")
+        
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={update.effective_user.id}"))
+        ]])
+        return await update.message.reply_text(upsell_text, reply_markup=keyboard, parse_mode="Markdown")
+
+    context.user_data["render_count"] = render_count + 1
+
     if not data.get("photo_path") or not os.path.exists(data["photo_path"]):
         return await update.message.reply_text("⚠️ Please send a photo first.")
 
@@ -123,9 +136,6 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
     try:
         # ۱. ترجمه درخواست کاربر
         english_request = translate_request_to_english(user_text)
-        
-        # 🔍 پیام دیباگ اول
-        await update.message.reply_text(f"🔍 [DEBUG] Translated:\n{english_request}")
 
         # ۲. ساخت پرامپت نهایی
         prompt_data = PromptEngine.build_final_prompt(
@@ -135,10 +145,6 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
             weather=data.get("weather"),
             user_text=english_request,
         )
-
-        # 🔍 پیام دیباگ دوم
-        debug_text = prompt_data['prompt'][:150] if isinstance(prompt_data, dict) else str(prompt_data)[:150]
-        await update.message.reply_text(f"🔍 [DEBUG] Final Prompt:\n{debug_text}...")
 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
 
@@ -161,15 +167,16 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
             with open(generated, "rb") as img:
                 await update.message.reply_photo(img)
 
-        # اطلاعات تکمیلی
-        materials = suggest_materials(data["space_type"], data["style"])
-        if materials: await update.message.reply_text("\n".join(materials))
-
-        cost = estimate_cost(data["space_type"], data["style"])
-        if cost: await update.message.reply_text(str(cost))
-
-        stores = get_store_suggestions(data["space_type"], data["style"])
-        if stores: await update.message.reply_text("\n".join(stores))
+        # نمایش امکانات تکمیلی بر اساس وضعیت کاربر
+        if is_premium:
+            stores = get_store_suggestions(data["space_type"], data["style"])
+            if stores: await update.message.reply_text(f"🛒 **پیشنهاد متریال و فروشگاه‌ها:**\n" + "\n".join(stores), parse_mode="Markdown")
+            
+            cost = estimate_cost(data["space_type"], data["style"])
+            if cost: await update.message.reply_text(f"📊 **برآورد هزینه‌های پروژه:**\n{str(cost)}", parse_mode="Markdown")
+        else:
+            materials = suggest_materials(data["space_type"], data["style"])
+            if materials: await update.message.reply_text("\n".join(materials))
 
         # آپدیت استیت کاربر
         context.user_data.update({
@@ -181,7 +188,7 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
 
         await update.message.reply_text(
             t(update, context, "wallet_prompt"),
-            reply_markup=result_keyboard(update, project_id),
+            reply_markup=result_keyboard(update, context, project_id),
         )
 
     except Exception as e:
@@ -195,7 +202,22 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reset_user_flow(context)
-    await update.message.reply_text(t(update, context, "welcome"))
+    btn_text = t(update, context, "premium_btn")
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={update.effective_user.id}"))]
+    ])
+    await update.message.reply_text(t(update, context, "welcome"), reply_markup=keyboard, parse_mode="Markdown")
+
+
+async def premium_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    info_text = t(update, context, "premium_info")
+    btn_text = t(update, context, "ton_panel_btn")
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={update.effective_user.id}"))]
+    ])
+    await update.message.reply_text(info_text, reply_markup=keyboard, parse_mode="Markdown")
 
 
 def process_image_sync(temp_path: str, image_path: str):
@@ -222,9 +244,7 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     temp = image_path + ".temp"
 
     await tg_file.download_to_drive(temp)
-
     await asyncio.to_thread(process_image_sync, temp, image_path)
-
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     
     try:
@@ -276,10 +296,36 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     context.user_data["lang"] = detect_message_lang(text)
 
+    # اگر منتظر توضیحات تغییر عکس هستیم
     if context.user_data.get("awaiting_description"):
         if not context.user_data.get("photo_path") or not os.path.exists(context.user_data["photo_path"]):
-            return await update.message.reply_text("⚠️ Please send a photo first.")
+            return await update.message.reply_text("⚠️ لطفا ابتدا یک عکس از فضا ارسال کنید.")
         await process_request(update, context, text)
+        
+    # در غیر این صورت، استفاده به عنوان دستیار هوشمند معماری
+    else:
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+        
+        system_prompt = (
+            "You are ArchAgent, an expert AI architect and interior designer. "
+            "You provide professional advice on building materials, interior design concepts, "
+            "color palettes, and space planning. Be helpful, concise, and professional. "
+            "Respond in the same language the user speaks. Do not offer image editing in this prompt."
+        )
+        
+        try:
+            response = await openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text}
+                ]
+            )
+            ai_reply = response.choices[0].message.content
+            await update.message.reply_text(ai_reply)
+        except Exception as e:
+            print(f"OpenAI Error: {e}")
+            await update.message.reply_text("❌ متأسفانه در ارتباط با دستیار هوشمند مشکلی رخ داد. لطفاً دوباره امتحان کنید.")
 
 
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -328,7 +374,7 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from nft import create_mint_request
             await query.message.reply_text("⏳ Uploading to IPFS...")
             mint_data = create_mint_request(project_id, "Pending", "ArchAgent", "AI Design on TON", img_path)
-            await query.message.reply_text(f"✅ Pinned! Connect your wallet in the TON Panel to complete minting.")
+            await query.message.reply_text("✅ Pinned! Connect your wallet in the TON Panel to complete minting.")
         except Exception as e:
             print(f"NFT error: {e}")
             await query.message.reply_text("❌ Error uploading NFT.")
@@ -354,38 +400,28 @@ def webapp():
 # =========================
 
 def run_bot():
-    # ساخت یک Event Loop جدید برای این Thread برای جلوگیری از خطاهای asyncio
     asyncio.set_event_loop(asyncio.new_event_loop())
-    
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("premium", premium_panel))
+    app.add_handler(CommandHandler("wallet", premium_panel))
+    
     app.add_handler(MessageHandler(filters.PHOTO, photo))
     app.add_handler(MessageHandler(filters.VOICE, voice_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
     app.add_handler(CallbackQueryHandler(handle_callbacks))
 
     print("🚀 ArchAgent bot is polling...")
-    
-    # بسیار مهم: غیرفعال کردن سیگنال‌ها با stop_signals=None 
-    # تا اجرای ربات در Thread پس‌زمینه باعث کرش کردن نشود
     app.run_polling(stop_signals=None)
 
-
 def main():
-    # ۱. ربات تلگرام را در یک Thread پس‌زمینه راه‌اندازی می‌کنیم
     threading.Thread(target=run_bot, daemon=True).start()
-
-    # ۲. سرور وب را در Thread اصلی اجرا می‌کنیم تا پورت Render با موفقیت باز شود
+    
     port = int(os.environ.get("PORT", 10000))
     print(f"🌐 Starting Web Server on port {port} for Render/UptimeRobot...")
     
-    uvicorn.run(
-        app_web,
-        host="0.0.0.0",
-        port=port,
-        log_level="warning"
-    )
+    uvicorn.run(app_web, host="0.0.0.0", port=port, log_level="warning")
 
 if __name__ == "__main__":
     main()
