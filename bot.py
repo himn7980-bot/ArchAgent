@@ -349,20 +349,14 @@ def health():
 def webapp():
     return HTMLResponse("<h2>💎 TON Panel</h2><p>Connect your wallet to Mint NFTs or Pay for Pro features.</p>")
 
-def run_web():
-    uvicorn.run(
-        app_web,
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000)),
-        log_level="warning"
-    )
-
-
 # =========================
 # Main Setup
 # =========================
 
-def main():
+def run_bot():
+    # ساخت یک Event Loop جدید برای این Thread برای جلوگیری از خطاهای asyncio
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -371,10 +365,27 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
     app.add_handler(CallbackQueryHandler(handle_callbacks))
 
-    threading.Thread(target=run_web, daemon=True).start()
-    print("🚀 ArchAgent is running and ready for UptimeRobot!")
-    app.run_polling()
+    print("🚀 ArchAgent bot is polling...")
+    
+    # بسیار مهم: غیرفعال کردن سیگنال‌ها با stop_signals=None 
+    # تا اجرای ربات در Thread پس‌زمینه باعث کرش کردن نشود
+    app.run_polling(stop_signals=None)
 
+
+def main():
+    # ۱. ربات تلگرام را در یک Thread پس‌زمینه راه‌اندازی می‌کنیم
+    threading.Thread(target=run_bot, daemon=True).start()
+
+    # ۲. سرور وب را در Thread اصلی اجرا می‌کنیم تا پورت Render با موفقیت باز شود
+    port = int(os.environ.get("PORT", 10000))
+    print(f"🌐 Starting Web Server on port {port} for Render/UptimeRobot...")
+    
+    uvicorn.run(
+        app_web,
+        host="0.0.0.0",
+        port=port,
+        log_level="warning"
+    )
 
 if __name__ == "__main__":
     main()
