@@ -49,11 +49,13 @@ class PromptEngine:
         space_text = cls.get_space_details(space_type)
         env_text = cls.get_environment_details(time_of_day, weather, space_type)
 
-        user_focus = f"CRITICAL REQUIREMENT: {user_text}, " if user_text else ""
+        # 👈 استفاده از وزن‌دهی قوی (1.5) برای مجبور کردن هوش مصنوعی به تغییر رنگ
+        user_focus = f"({user_text}:1.5), strongly colored {user_text}, " if user_text else ""
 
-        positive_prompt = f"{user_focus}{space_text}, {style_text}, {env_text}, Hyper-realistic photogrammetry-grade textures, cinematic lighting, Ray-traced reflections, Unreal Engine 5 render style, professional architectural photography, award-winning archviz"
+        positive_prompt = f"{user_focus}{space_text}, {style_text}, {env_text}, Hyper-realistic photogrammetry-grade textures, cinematic lighting"
         
-        negative_prompt = "cartoon, drawing, 3d render style, low quality, plastic textures, blurry, distorted window frames, messy geometry, extra buildings, text, logo, watermark, warped lines, flat lighting"
+        # 👈 پرامپت منفی بسیار سخت‌گیرانه تا رنگ سفید عکس اصلی را رها کند
+        negative_prompt = "white cabinets, pale colors, original materials, cartoon, drawing, 3d render style, low quality, plastic textures, blurry, flat lighting"
 
         return {
             "prompt": positive_prompt,
