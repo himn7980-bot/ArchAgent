@@ -16,7 +16,6 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
 def _build_endpoint() -> str:
-    # 👈 مشکل دقیقاً اینجا بود که اصلاح شد (IMAGE به جای API)
     model_path = STABILITY_IMAGE_MODEL.strip().lstrip("/")
     return f"{STABILITY_API_HOST}/v2beta/{model_path}"
 
@@ -28,7 +27,6 @@ def generate_design(input_image_path: str, mask_path: Optional[str], prompt_data
     if not os.path.exists(input_image_path):
         raise FileNotFoundError(f"Input image not found: {input_image_path}")
 
-    # استخراج پرامپت‌ها
     if isinstance(prompt_data, dict):
         positive_prompt = prompt_data.get("prompt", "").strip()
         negative_prompt = prompt_data.get("negative_prompt", "").strip()
@@ -47,10 +45,9 @@ def generate_design(input_image_path: str, mask_path: Optional[str], prompt_data
         "Accept": "image/*",
     }
 
-    # عدد جادویی برای حفظ هندسه آشپزخانه: 0.65
-    optimal_strength = 0.65
+    # 👈 تغییر حیاتی: کاهش وفاداری به عکس اصلی برای اعمال شدن رنگ‌های جدید
+    optimal_strength = 0.45
 
-    # تولید عدد رندوم واقعی
     current_seed = _normalize_seed(STABILITY_SEED)
     if current_seed == 0:
         current_seed = random.randint(1000000, 9999999)
