@@ -1,6 +1,7 @@
 import os
 import asyncio
 import threading
+import json
 from PIL import Image
 
 import uvicorn
@@ -29,8 +30,12 @@ from cost import estimate_cost
 from stores import get_store_suggestions
 from storage import create_project
 from prompt_engine import PromptEngine
+import database
 
-# راه‌اندازی کلاینت OpenAI برای دستیار هوشمند معماری
+# مقداردهی دیتابیس در زمان اجرا
+database.init_db()
+
+# راه‌اندازی کلاینت OpenAI
 openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # =========================
@@ -44,9 +49,12 @@ def detect_message_lang(text: str) -> str:
     if any("\u0400" <= ch <= "\u04FF" for ch in text): return "ru"
     return "en"
 
-def get_user_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
-    saved = context.user_data.get("lang")
-    if saved: return saved
+def get_user_lang(update: Update):
+    user_id = update.effective_user.id
+    db_user = database.get_user(user_id)
+    if db_user:
+        return db_user["lang"]
+    
     lang = (update.effective_user.language_code or "en").lower()
     if lang.startswith("fa"): return "fa"
     if lang.startswith("ar"): return "ar"
@@ -54,14 +62,13 @@ def get_user_lang(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     return "en"
 
 def t(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str):
-    lang = get_user_lang(update, context)
+    lang = get_user_lang(update)
     return TEXTS.get(lang, TEXTS["en"]).get(key, key)
 
 def reset_user_flow(context):
     lang = context.user_data.get("lang")
     context.user_data.clear()
-    if lang:
-        context.user_data["lang"] = lang
+    if lang: context.user_data["lang"] = lang
 
 # =========================
 # Keyboards
@@ -88,9 +95,7 @@ def weather_keyboard():
     ])
 
 def result_keyboard(update, context, project_id):
-    # دریافت نام دکمه پنل بر اساس زبان کاربر
     btn_text = t(update, context, "ton_panel_btn")
-    
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🔁 Regenerate", callback_data="redo"),
@@ -110,34 +115,31 @@ def result_keyboard(update, context, project_id):
 # =========================
 
 async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, user_text: str):
-    data = context.user_data
+    user_id = update.effective_user.id
+    db_user = database.get_user(user_id)
     
-    # بررسی محدودیت رندرهای رایگان (Premium Check)
-    render_count = data.get("render_count", 0)
-    is_premium = data.get("is_premium", False)
-
-    if render_count >= 3 and not is_premium:
+    if not db_user or db_user["credits"] <= 0:
         upsell_text = t(update, context, "upsell")
         btn_text = t(update, context, "premium_btn")
         
         keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={update.effective_user.id}"))
+            InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))
         ]])
         return await update.message.reply_text(upsell_text, reply_markup=keyboard, parse_mode="Markdown")
 
-    context.user_data["render_count"] = render_count + 1
-
+    data = context.user_data
     if not data.get("photo_path") or not os.path.exists(data["photo_path"]):
         return await update.message.reply_text("⚠️ Please send a photo first.")
+
+    # کسر کریدیت از دیتابیس
+    database.deduct_credit(user_id)
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     await update.message.reply_text(t(update, context, "generating"))
 
     try:
-        # ۱. ترجمه درخواست کاربر
         english_request = translate_request_to_english(user_text)
 
-        # ۲. ساخت پرامپت نهایی
         prompt_data = PromptEngine.build_final_prompt(
             space_type=data.get("space_type", "interior"),
             style=data.get("style", "modern"),
@@ -147,38 +149,30 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
         )
 
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
-
-        # ۳. ارسال به موتور استبیلیتی
         generated = generate_design(data["photo_path"], None, prompt_data)
 
-        # ذخیره پروژه
         project_id = create_project(
-            str(update.effective_user.id),
-            {
-                "generated_image": generated,
-                "prompt": str(prompt_data)
-            }
+            str(user_id),
+            {"generated_image": generated, "prompt": str(prompt_data)}
         )
 
-        # ارسال خروجی
         if generated.startswith("http"):
             await update.message.reply_photo(generated)
         else:
             with open(generated, "rb") as img:
                 await update.message.reply_photo(img)
 
-        # نمایش امکانات تکمیلی بر اساس وضعیت کاربر
-        if is_premium:
+        # اگر کاربر پریمیوم است
+        if db_user["is_premium"]:
             stores = get_store_suggestions(data["space_type"], data["style"])
-            if stores: await update.message.reply_text(f"🛒 **پیشنهاد متریال و فروشگاه‌ها:**\n" + "\n".join(stores), parse_mode="Markdown")
+            if stores: await update.message.reply_text(f"🛒 **Stores & Materials:**\n" + "\n".join(stores), parse_mode="Markdown")
             
             cost = estimate_cost(data["space_type"], data["style"])
-            if cost: await update.message.reply_text(f"📊 **برآورد هزینه‌های پروژه:**\n{str(cost)}", parse_mode="Markdown")
+            if cost: await update.message.reply_text(f"📊 **Cost Estimation:**\n{str(cost)}", parse_mode="Markdown")
         else:
             materials = suggest_materials(data["space_type"], data["style"])
             if materials: await update.message.reply_text("\n".join(materials))
 
-        # آپدیت استیت کاربر
         context.user_data.update({
             "awaiting_description": False,
             "last_project_id": project_id,
@@ -192,33 +186,79 @@ async def process_request(update: Update, context: ContextTypes.DEFAULT_TYPE, us
         )
 
     except Exception as e:
-        print(f"Error in process_request: {e}")
+        print(f"Error: {e}")
+        # بازگرداندن کریدیت در صورت خطا
+        database.add_credits(user_id, 1)
         await update.message.reply_text(f"❌ Error: {str(e)}")
-
 
 # =========================
 # Handlers
 # =========================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    reset_user_flow(context)
-    btn_text = t(update, context, "premium_btn")
+    user_id = update.effective_user.id
+    lang = get_user_lang(update)
     
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={update.effective_user.id}"))]
-    ])
-    await update.message.reply_text(t(update, context, "welcome"), reply_markup=keyboard, parse_mode="Markdown")
-
-
-async def premium_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    info_text = t(update, context, "premium_info")
+    # ساخت حساب کاربری در دیتابیس با 3 کریدیت رایگان اولیه
+    database.create_user_if_not_exists(user_id, lang)
+    
+    reset_user_flow(context)
     btn_text = t(update, context, "ton_panel_btn")
     
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={update.effective_user.id}"))]
+        [InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))]
     ])
-    await update.message.reply_text(info_text, reply_markup=keyboard, parse_mode="Markdown")
+    await update.message.reply_text(t(update, context, "welcome"), reply_markup=keyboard, parse_mode="Markdown")
 
+async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    db_user = database.get_user(user_id)
+    
+    if not db_user:
+        return await update.message.reply_text("User not found. Please send /start.")
+
+    is_premium = db_user["is_premium"]
+    credits = db_user["credits"]
+    
+    user_name = update.effective_user.first_name
+    icon = "💎" if is_premium else ""
+    status = "Premium Member" if is_premium else "Free User"
+    
+    text = t(update, context, "profile").format(
+        name=user_name, icon=icon, status=status, credits=credits
+    )
+    
+    # دکمه خرید در پروفایل
+    btn_text = t(update, context, "ton_panel_btn")
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))]])
+    
+    await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
+
+async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    try:
+        data = json.loads(update.message.web_app_data.data)
+        if data.get("action") == "payment_success":
+            pkg = data.get("package")
+            added_credits = 0
+            
+            if pkg == "starter": added_credits = 15
+            elif pkg == "pro": added_credits = 35
+            elif pkg == "master": added_credits = 80
+                
+            # اضافه کردن کریدیت به دیتابیس
+            database.add_credits(user_id, added_credits)
+            
+            # خواندن موجودی جدید برای پیام موفقیت
+            db_user = database.get_user(user_id)
+            current_credits = db_user["credits"]
+            
+            msg = t(update, context, "payment_success").format(
+                amount=added_credits, credits=current_credits
+            )
+            await update.message.reply_text(msg, parse_mode="Markdown")
+    except Exception as e:
+        print(f"Web App Data Error: {e}")
 
 def process_image_sync(temp_path: str, image_path: str):
     with Image.open(temp_path) as img:
@@ -229,9 +269,7 @@ def process_image_sync(temp_path: str, image_path: str):
         canvas = Image.new("RGBA", (1024, 1024), (255, 255, 255, 255))
         canvas.paste(resized, ((1024 - new[0]) // 2, (1024 - new[1]) // 2))
         canvas.save(image_path)
-    if os.path.exists(temp_path):
-        os.remove(temp_path)
-
+    if os.path.exists(temp_path): os.remove(temp_path)
 
 async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.UPLOAD_PHOTO)
@@ -247,72 +285,45 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.to_thread(process_image_sync, temp, image_path)
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     
-    try:
-        scene = detect_scene(image_path)
-    except:
-        scene = "interior"
+    try: scene = detect_scene(image_path)
+    except: scene = "interior"
 
     context.user_data.update({
         "photo_path": image_path,
         "space_type": scene,
-        "style": None,
-        "time_of_day": None,
-        "weather": None,
+        "style": None, "time_of_day": None, "weather": None,
         "awaiting_description": False,
     })
 
     await update.message.reply_text(f"Scene detected: {scene}\nChoose style:", reply_markup=style_keyboard())
 
-
-async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("photo_path") or not os.path.exists(context.user_data["photo_path"]):
-        return await update.message.reply_text("⚠️ Please send a photo first.")
-
-    path = os.path.join(UPLOAD_DIR, f"voice_{update.effective_user.id}.ogg")
-    
-    try:
-        file = await context.bot.get_file(update.message.voice.file_id)
-        await file.download_to_drive(path)
-
-        transcription = transcribe_voice(path)
-        text = transcription.get("text", "")
-        
-        if not text:
-            return await update.message.reply_text("Could not understand the voice.")
-            
-        await update.message.reply_text(f"🎤 You said: {text}")
-        context.user_data["awaiting_description"] = True
-        await process_request(update, context, text)
-        
-    except Exception as e:
-        print(f"Voice error: {e}")
-        await update.message.reply_text("Error processing voice message.")
-    finally:
-        if os.path.exists(path):
-            os.remove(path)
-
-
 async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    context.user_data["lang"] = detect_message_lang(text)
+    user_id = update.effective_user.id
+    
+    # آپدیت زبان کاربر در دیتابیس بر اساس متن
+    lang = detect_message_lang(text)
+    database.update_user_lang(user_id, lang)
 
-    # اگر منتظر توضیحات تغییر عکس هستیم
     if context.user_data.get("awaiting_description"):
         if not context.user_data.get("photo_path") or not os.path.exists(context.user_data["photo_path"]):
             return await update.message.reply_text("⚠️ لطفا ابتدا یک عکس از فضا ارسال کنید.")
         await process_request(update, context, text)
-        
-    # در غیر این صورت، استفاده به عنوان دستیار هوشمند معماری
     else:
+        db_user = database.get_user(user_id)
+        if not db_user or not db_user["is_premium"]:
+            upsell_text = t(update, context, "upsell")
+            btn_text = t(update, context, "premium_btn")
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(btn_text, web_app=WebAppInfo(url=f"{MINIAPP_URL}?user_id={user_id}"))]])
+            return await update.message.reply_text("🌟 चت با هوش مصنوعی مختص کاربران Premium است.\n\n" + upsell_text, reply_markup=keyboard, parse_mode="Markdown")
+
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-        
         system_prompt = (
             "You are ArchAgent, an expert AI architect and interior designer. "
             "You provide professional advice on building materials, interior design concepts, "
             "color palettes, and space planning. Be helpful, concise, and professional. "
             "Respond in the same language the user speaks. Do not offer image editing in this prompt."
         )
-        
         try:
             response = await openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -321,12 +332,9 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     {"role": "user", "content": text}
                 ]
             )
-            ai_reply = response.choices[0].message.content
-            await update.message.reply_text(ai_reply)
+            await update.message.reply_text(response.choices[0].message.content)
         except Exception as e:
-            print(f"OpenAI Error: {e}")
-            await update.message.reply_text("❌ متأسفانه در ارتباط با دستیار هوشمند مشکلی رخ داد. لطفاً دوباره امتحان کنید.")
-
+            await update.message.reply_text("❌ خطا در ارتباط با دستیار هوشمند.")
 
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -337,7 +345,6 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reset_user_flow(context)
         await query.message.reply_text("🔄 Restarted. Please send a new photo.")
         return
-
     if data == "cancel":
         context.user_data["awaiting_description"] = False
         await query.message.reply_text("❌ Cancelled. You can send a new photo anytime.")
@@ -346,54 +353,127 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("style_"):
         context.user_data["style"] = data.replace("style_", "")
         await query.message.reply_text("Choose time of day:", reply_markup=time_keyboard())
-
     elif data.startswith("time_"):
         context.user_data["time_of_day"] = data.replace("time_", "") if "skip" not in data else None
         await query.message.reply_text("Choose weather:", reply_markup=weather_keyboard())
-
     elif data.startswith("weather_"):
         context.user_data["weather"] = data.replace("weather_", "") if "skip" not in data else None
         context.user_data["awaiting_description"] = True
         await query.message.reply_text("Please describe what you want to change (e.g., 'Blue cabinets, wood floor'):")
-
     elif data == "redo":
         last_request = context.user_data.get("last_request_text", "")
         await query.message.reply_text("🔁 Regenerating your design...")
         await process_request(update, context, last_request)
-
     elif data == "change_style":
         await query.message.reply_text("Choose a new style:", reply_markup=style_keyboard())
 
-    elif data == "mint_hint":
-        project_id = context.user_data.get("last_project_id")
-        img_path = context.user_data.get("last_generated_image")
-        if not project_id or not img_path:
-            return await query.message.reply_text("❌ No recent project found to mint.")
-            
-        try:
-            from nft import create_mint_request
-            await query.message.reply_text("⏳ Uploading to IPFS...")
-            mint_data = create_mint_request(project_id, "Pending", "ArchAgent", "AI Design on TON", img_path)
-            await query.message.reply_text("✅ Pinned! Connect your wallet in the TON Panel to complete minting.")
-        except Exception as e:
-            print(f"NFT error: {e}")
-            await query.message.reply_text("❌ Error uploading NFT.")
-
-
 # =========================
-# FastAPI & UptimeRobot
+# FastAPI & WebApp (TON Payment)
 # =========================
 
 app_web = FastAPI()
+MY_WALLET_ADDRESS = "UQDPVUpClyvBg0GXnl-IHVB6Q5I_CRp-psFhkasI-uPMpUfm"
 
 @app_web.get("/")
 @app_web.get("/ping")
-def health():
-    return {"ArchAgent": "running", "status": "200 OK"}
+def health(): return {"ArchAgent": "running", "status": "200 OK"}
 
 @app_web.get("/webapp/index.html")
 def webapp():
-    return HTMLResponse("<h2>💎 TON Panel</h2><p>Connect your wallet to Mint NFTs or Pay for Pro features.</p>")
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ArchAgent Store</title>
+        <script src="https://telegram.org/js/telegram-web-app.js"></script>
+        <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+        <style>
+            body {{ font-family: sans-serif; background-color: #181818; color: white; text-align: center; padding: 20px; }}
+            .container {{ max-width: 400px; margin: auto; }}
+            .package-card {{ background: #222; border: 1px solid #333; border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }}
+            .package-info {{ text-align: left; }}
+            .package-title {{ font-size: 18px; font-weight: bold; color: #0098EA; margin-bottom: 5px; }}
+            .package-desc {{ font-size: 13px; color: #aaa; }}
+            .buy-btn {{ background: #0098EA; color: white; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; display: none; }}
+            #ton-connect {{ display: flex; justify-content: center; margin-bottom: 25px; }}
+            .header-text {{ margin-bottom: 20px; font-size: 14px; color: #ddd; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>💎 Recharge Renders</h2>
+            <p class="header-text">Connect wallet and buy credits. 1 Credit = 1 AI 8K Render + AI Chat.</p>
+            <div id="ton-connect"></div>
+            
+            <div class="package-card">
+                <div class="package-info">
+                    <div class="package-title">Starter Pack</div>
+                    <div class="package-desc">15 Renders</div>
+                </div>
+                <button class="buy-btn" onclick="buyPackage('starter', '0.5')">0.5 TON</button>
+            </div>
+
+            <div class="package-card" style="border-color: #0098EA;">
+                <div class="package-info">
+                    <div class="package-title">Pro Pack 🔥</div>
+                    <div class="package-desc">35 Renders (Best Value)</div>
+                </div>
+                <button class="buy-btn" onclick="buyPackage('pro', '1.0')">1 TON</button>
+            </div>
+
+            <div class="package-card">
+                <div class="package-info">
+                    <div class="package-title">Master Pack</div>
+                    <div class="package-desc">80 Renders</div>
+                </div>
+                <button class="buy-btn" onclick="buyPackage('master', '2.0')">2 TON</button>
+            </div>
+            <p id="status-msg" style="margin-top: 15px; color: #4CAF50;"></p>
+        </div>
+
+        <script>
+            const tg = window.Telegram.WebApp;
+            tg.expand();
+
+            const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({{
+                manifestUrl: 'https://raw.githubusercontent.com/ton-community/tutorials/main/03-client/test/public/tonconnect-manifest.json',
+                buttonRootId: 'ton-connect'
+            }});
+
+            tonConnectUI.onStatusChange(wallet => {{
+                const buttons = document.querySelectorAll('.buy-btn');
+                buttons.forEach(btn => btn.style.display = wallet ? 'block' : 'none');
+            }});
+
+            async function buyPackage(pkgType, priceTon) {{
+                try {{
+                    const nanoTon = parseFloat(priceTon) * 1000000000;
+                    const transaction = {{
+                        validUntil: Math.floor(Date.now() / 1000) + 360,
+                        messages: [{{
+                            address: "{MY_WALLET_ADDRESS}",
+                            amount: nanoTon.toString(),
+                            payload: ""
+                        }}]
+                    }};
+
+                    document.getElementById('status-msg').innerText = "⏳ Confirm transaction in your wallet...";
+                    await tonConnectUI.sendTransaction(transaction);
+                    
+                    document.getElementById('status-msg').innerText = "✅ Success! Returning to bot...";
+                    tg.sendData(JSON.stringify({{action: "payment_success", package: pkgType}}));
+                }} catch (e) {{
+                    document.getElementById('status-msg').style.color = "#FF5252";
+                    document.getElementById('status-msg').innerText = "❌ Payment failed or cancelled.";
+                }}
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 # =========================
 # Main Setup
@@ -404,15 +484,17 @@ def run_bot():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("premium", premium_panel))
-    app.add_handler(CommandHandler("wallet", premium_panel))
+    app.add_handler(CommandHandler("me", show_profile))
+    app.add_handler(CommandHandler("profile", show_profile))
     
     app.add_handler(MessageHandler(filters.PHOTO, photo))
     app.add_handler(MessageHandler(filters.VOICE, voice_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
     app.add_handler(CallbackQueryHandler(handle_callbacks))
+    
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
 
-    print("🚀 ArchAgent bot is polling...")
+    print("🚀 ArchAgent bot is polling with SQLite DB...")
     app.run_polling(stop_signals=None)
 
 def main():
@@ -420,7 +502,6 @@ def main():
     
     port = int(os.environ.get("PORT", 10000))
     print(f"🌐 Starting Web Server on port {port} for Render/UptimeRobot...")
-    
     uvicorn.run(app_web, host="0.0.0.0", port=port, log_level="warning")
 
 if __name__ == "__main__":
